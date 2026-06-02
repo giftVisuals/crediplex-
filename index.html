@@ -2093,8 +2093,8 @@ window.setTpTab = function(tab, open, closed){
 // ─── POLYMARKET FULL AUTO-SYNC ────────────────────────────────
 
 const PROXY_URLS = [
+  url => `/api/polymarket?url=${encodeURIComponent(url)}`,
   url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
 ];
 
 async function fetchWithProxy(url){
