@@ -18,7 +18,7 @@ const NP_BASE = 'https://api.nowpayments.io/v1';
 // ── FIREBASE ADMIN ──
 // Place your Firebase service account JSON file in the same folder
 // and name it: serviceAccountKey.json
-const serviceAccount = require('./serviceAccountKey.json');
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
