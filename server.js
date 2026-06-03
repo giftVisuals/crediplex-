@@ -11,8 +11,8 @@ app.use(express.json());
 app.use(cors({ origin: '*' }));
 
 // ── NOWPAYMENTS CONFIG ──
-const NP_API_KEY = 'AFF7GM5-C8Q49QR-K0BB1Q6-V3XPHD5';
-const NP_IPN_SECRET = 'cysKayY7v5nv9ZSquk2GFD95G83iWV7Y';
+const NP_API_KEY = process.env.NP_API_KEY;
+const NP_IPN_SECRET = process.env.NP_IPN_SECRET;
 const NP_BASE = 'https://api.nowpayments.io/v1';
 
 // ── FIREBASE ADMIN ──
