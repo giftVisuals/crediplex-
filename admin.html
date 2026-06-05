@@ -512,7 +512,12 @@
         <div class="glass-card">
           <div class="card-header">
             <div class="card-title">All Markets</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <div style="display:flex;gap:4px;background:rgba(37,99,235,0.06);border-radius:8px;padding:3px">
+                <button onclick="setMarketFilter('all')" id="mf-all" style="padding:5px 12px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;background:#2563eb;color:white;font-family:'DM Sans',sans-serif">All</button>
+                <button onclick="setMarketFilter('crediplex')" id="mf-crediplex" style="padding:5px 12px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;background:transparent;color:#64748b;font-family:'DM Sans',sans-serif">Crediplex</button>
+                <button onclick="setMarketFilter('polymarket')" id="mf-polymarket" style="padding:5px 12px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;background:transparent;color:#64748b;font-family:'DM Sans',sans-serif">Polymarket</button>
+              </div>
               <button class="btn btn-ghost" id="pm-sync-btn" onclick="adminSyncPolymarket()">🔄 Sync Polymarket</button>
               <button class="btn btn-primary" onclick="openModal('modal-create-market')">＋ Create Market</button>
             </div>
@@ -666,33 +671,58 @@
 
 <!-- Create Market -->
 <div class="modal-overlay" id="modal-create-market">
-  <div class="modal">
+  <div class="modal" style="max-width:600px">
     <div class="modal-header">
       <div class="modal-title">Create New Market</div>
       <button class="modal-close" onclick="closeModal('modal-create-market')">✕</button>
     </div>
     <div class="modal-body">
-      <div class="form-group"><label class="form-label">Question</label><textarea class="form-control" id="mk-question" placeholder="e.g. Will Bitcoin hit $100k by end of year?"></textarea></div>
+      <div class="form-group"><label class="form-label">Question</label><textarea class="form-control" id="mk-question" placeholder="e.g. Who will win the 2027 Nigeria election?"></textarea></div>
       <div class="form-group"><label class="form-label">Category</label>
         <select class="form-control" id="mk-category">
-          <option value="Sports">Sports</option><option value="Crypto">Crypto</option>
-          <option value="Politics">Politics</option><option value="Entertainment">Entertainment</option>
-          <option value="Business">Business</option><option value="Others">Others</option>
+          <option value="Sports">⚽ Sports</option>
+          <option value="Crypto">₿ Crypto</option>
+          <option value="Politics">🏛️ Politics</option>
+          <option value="Election">🗳️ Election</option>
+          <option value="Geopolitical">🌍 Geopolitical</option>
+          <option value="Tech">💻 Tech & AI</option>
+          <option value="Culture">🎭 Culture</option>
+          <option value="Economic">📊 Economic</option>
+          <option value="Business">💼 Business</option>
+          <option value="Entertainment">🎬 Entertainment</option>
+          <option value="Weather">🌤️ Weather</option>
+          <option value="Others">🌐 Others</option>
         </select>
+      </div>
+      <div class="form-group"><label class="form-label">Market Type</label>
+        <div style="display:flex;gap:8px">
+          <button id="mk-type-binary" onclick="setMkType('binary')" style="flex:1;padding:10px;border-radius:8px;border:2px solid #2563eb;background:#2563eb;color:white;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">YES / NO</button>
+          <button id="mk-type-multi" onclick="setMkType('multi')" style="flex:1;padding:10px;border-radius:8px;border:2px solid #e2e8f0;background:white;color:#64748b;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">Multiple Outcomes</button>
+        </div>
+      </div>
+      <!-- MULTI OUTCOMES SECTION -->
+      <div id="mk-outcomes-section" style="display:none">
+        <div class="form-group">
+          <label class="form-label">Outcomes (up to 100)</label>
+          <div id="mk-outcomes-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+            <div class="mk-outcome-row" style="display:flex;gap:8px;align-items:center">
+              <input class="form-control" style="flex:1" placeholder="Outcome 1 e.g. Tinubu" />
+              <button onclick="removeMkOutcome(this)" style="background:rgba(239,68,68,0.1);border:none;color:#dc2626;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;flex-shrink:0">✕</button>
+            </div>
+            <div class="mk-outcome-row" style="display:flex;gap:8px;align-items:center">
+              <input class="form-control" style="flex:1" placeholder="Outcome 2 e.g. Atiku" />
+              <button onclick="removeMkOutcome(this)" style="background:rgba(239,68,68,0.1);border:none;color:#dc2626;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;flex-shrink:0">✕</button>
+            </div>
+          </div>
+          <button onclick="addMkOutcome()" style="width:100%;padding:10px;border-radius:8px;border:1.5px dashed rgba(37,99,235,0.3);background:rgba(37,99,235,0.04);color:#2563eb;font-weight:600;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">+ Add New Field</button>
+        </div>
       </div>
       <div class="form-group"><label class="form-label">Deadline</label><input class="form-control" type="datetime-local" id="mk-deadline" /></div>
       <div class="form-group"><label class="form-label">Market Image</label>
         <input type="file" id="mk-img-file" accept="image/*" class="form-control" onchange="previewImg(this)" />
-        <div id="mk-img-preview" style="margin-top:8px;display:none">
+        <div id="mk-img-preview" style="margin-top:8px;display:none;align-items:center;gap:8px">
           <img id="mk-img-thumb" style="width:60px;height:60px;object-fit:contain;border-radius:10px;border:1px solid rgba(37,99,235,0.15)" />
-          <span id="mk-img-status" style="font-size:12px;color:#10b981;margin-left:8px">✅ Ready to upload</span>
-        </div>
-      </div>
-      <div class="form-group"><label class="form-label">Market Image</label>
-        <input type="file" id="mk-img-file" accept="image/*" class="form-control" onchange="previewImg(this)" />
-        <div id="mk-img-preview" style="margin-top:8px;display:none">
-          <img id="mk-img-thumb" style="width:60px;height:60px;object-fit:contain;border-radius:10px;border:1px solid rgba(37,99,235,0.15)" />
-          <span id="mk-img-status" style="font-size:12px;color:#10b981;margin-left:8px">✅ Ready to upload</span>
+          <span id="mk-img-status" style="font-size:12px;color:#10b981">✅ Ready to upload</span>
         </div>
       </div>
       <div class="form-group"><label class="form-label">Description</label><textarea class="form-control" id="mk-desc" placeholder="Describe the market conditions..."></textarea></div>
@@ -1008,9 +1038,12 @@ function listenMarkets() {
     renderMarketsTable();
   });
 }
+let _marketSourceFilter = 'all';
 function renderMarketsTable() {
   const tbody = document.getElementById('markets-tbody');
-  const mArr = Object.values(_markets).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  let mArr = Object.values(_markets).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  if(_marketSourceFilter === 'polymarket') mArr = mArr.filter(m=>m.source==='polymarket');
+  if(_marketSourceFilter === 'crediplex') mArr = mArr.filter(m=>m.source!=='polymarket');
   if (!mArr.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="e-icon">🏦</div><div class="e-msg">No markets yet</div></div></td></tr>'; return; }
   tbody.innerHTML = mArr.map(m => {
     const tot = Number(m.yesPool||0)+Number(m.noPool||0);
@@ -1031,6 +1064,38 @@ function renderMarketsTable() {
   }).join('');
 }
 const IMGBB_KEY = '3ba1a55964c6f25793b8c9bd780ce256';
+
+window._mkType = 'binary';
+window.setMkType = function(type){
+  window._mkType = type;
+  const isBinary = type === 'binary';
+  document.getElementById('mk-type-binary').style.background = isBinary ? '#2563eb' : 'white';
+  document.getElementById('mk-type-binary').style.color = isBinary ? 'white' : '#64748b';
+  document.getElementById('mk-type-binary').style.borderColor = isBinary ? '#2563eb' : '#e2e8f0';
+  document.getElementById('mk-type-multi').style.background = !isBinary ? '#2563eb' : 'white';
+  document.getElementById('mk-type-multi').style.color = !isBinary ? 'white' : '#64748b';
+  document.getElementById('mk-type-multi').style.borderColor = !isBinary ? '#2563eb' : '#e2e8f0';
+  document.getElementById('mk-outcomes-section').style.display = isBinary ? 'none' : '';
+};
+window.addMkOutcome = function(){
+  const list = document.getElementById('mk-outcomes-list');
+  const count = list.querySelectorAll('.mk-outcome-row').length + 1;
+  if(count > 100){ toast('Maximum 100 outcomes','warn'); return; }
+  const div = document.createElement('div');
+  div.className = 'mk-outcome-row';
+  div.style.cssText = 'display:flex;gap:8px;align-items:center';
+  div.innerHTML = `<input class="form-control" style="flex:1" placeholder="Outcome ${count}" /><button onclick="removeMkOutcome(this)" style="background:rgba(239,68,68,0.1);border:none;color:#dc2626;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;flex-shrink:0">✕</button>`;
+  list.appendChild(div);
+};
+window.removeMkOutcome = function(btn){
+  const row = btn.closest('.mk-outcome-row');
+  const list = document.getElementById('mk-outcomes-list');
+  if(list.querySelectorAll('.mk-outcome-row').length > 2){
+    row.remove();
+  } else {
+    toast('Need at least 2 outcomes','warn');
+  }
+};
 
 window.previewImg = function(input) {
   const file = input.files[0];
@@ -1059,7 +1124,17 @@ window.createMarket = async function() {
   const dl = document.getElementById('mk-deadline').value;
   const desc = document.getElementById('mk-desc').value.trim();
   const imgFile = document.getElementById('mk-img-file').files[0];
+  const mkType = window._mkType || 'binary';
   if (!q || !dl) { toast('Please fill in question and deadline','warn'); return; }
+
+  // collect outcomes
+  let outcomesArr = ['Yes','No'];
+  if(mkType === 'multi'){
+    const inputs = document.querySelectorAll('#mk-outcomes-list .mk-outcome-row input');
+    outcomesArr = Array.from(inputs).map(i=>i.value.trim()).filter(v=>v.length>0);
+    if(outcomesArr.length < 2){ toast('Add at least 2 outcomes','warn'); return; }
+  }
+
   try {
     const statusEl = document.getElementById('mk-img-status');
     let imageUrl = '';
@@ -1068,19 +1143,37 @@ window.createMarket = async function() {
       imageUrl = await uploadToImgbb(imgFile);
       if (statusEl) { statusEl.textContent = '✅ Uploaded!'; statusEl.style.color='#10b981'; }
     }
+
+    // build pool keys for multi-outcome
+    const poolsObj = { yesPool:0, noPool:0 };
+    if(mkType === 'multi'){
+      outcomesArr.forEach(o=>{
+        const key = 'pool_' + o.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
+        poolsObj[key] = 0;
+      });
+    }
+
     await addDoc(collection(db,'markets'), {
       question:q, category:cat,
       deadline: Timestamp.fromDate(new Date(dl)),
-      description:desc, yesPool:0, noPool:0,
-      status:'active', imageUrl, createdAt:serverTimestamp()
+      description:desc,
+      outcomes: JSON.stringify(outcomesArr),
+      outcomeCount: outcomesArr.length,
+      outcomePrices: JSON.stringify(outcomesArr.map(()=>0)),
+      ...poolsObj,
+      status:'active', imageUrl, createdAt:serverTimestamp(),
+      source: 'crediplex'
     });
+
     closeModal('modal-create-market');
     document.getElementById('mk-question').value='';
     document.getElementById('mk-desc').value='';
     document.getElementById('mk-deadline').value='';
     document.getElementById('mk-img-file').value='';
     document.getElementById('mk-img-preview').style.display='none';
-    toast('Market created with image!','success');
+    // reset type
+    setMkType('binary');
+    toast(`Market created! (${outcomesArr.length} outcomes)`,'success');
   } catch(e) { toast('Error: '+e.message,'error'); }
 };
 
@@ -1488,13 +1581,31 @@ async function fetchWithProxyAdmin(url){
   return null;
 }
 
-function detectCategoryAdmin(question){
+function detectCategoryAdmin(question, tags){
   const q = (question||'').toLowerCase();
-  if(q.includes('bitcoin')||q.includes(' btc')||q.includes('ethereum')||q.includes(' eth')||q.includes('crypto')||q.includes('solana')||q.includes('xrp')) return 'Crypto';
-  if(q.includes('election')||q.includes('president')||q.includes('senate')||q.includes('vote')||q.includes('minister')||q.includes('governor')||q.includes('parliament')) return 'Politics';
-  if(q.includes('oscar')||q.includes('grammy')||q.includes('emmy')||q.includes('movie')||q.includes('award')||q.includes('album')||q.includes('singer')||q.includes('actor')) return 'Entertainment';
-  if(q.includes('gdp')||q.includes('stock')||q.includes('market cap')||q.includes('revenue')||q.includes('ipo')||q.includes('nasdaq')||q.includes('inflation')||q.includes('fed ')) return 'Business';
-  if(q.includes('nba')||q.includes('nfl')||q.includes('nhl')||q.includes('mlb')||q.includes('soccer')||q.includes('football')||q.includes('match')||q.includes('champion')||q.includes('league')||q.includes('cup')||q.includes('tennis')||q.includes('golf')||q.includes('mma')||q.includes('ufc')||q.includes('cricket')||q.includes('liverpool')||q.includes('chelsea')||q.includes('arsenal')||q.includes('manchester')||q.includes('barcelona')||q.includes('madrid')||q.includes('lakers')||q.includes('warriors')||q.includes('celtics')||q.includes('premier league')||q.includes('world cup')||q.includes('super bowl')) return 'Sports';
+  const t = (tags||[]).join(' ').toLowerCase();
+  const combined = q + ' ' + t;
+  if(t.includes('sports')||t.includes('nba')||t.includes('nfl')||t.includes('soccer')||t.includes('tennis')||t.includes('golf')||t.includes('mma')||t.includes('cricket')||t.includes('esports')) return 'Sports';
+  if(t.includes('election')) return 'Election';
+  if(t.includes('politics')||t.includes('political')) return 'Politics';
+  if(t.includes('crypto')||t.includes('bitcoin')||t.includes('ethereum')||t.includes('defi')) return 'Crypto';
+  if(t.includes('tech')||t.includes('ai')||t.includes('technology')) return 'Tech';
+  if(t.includes('culture')||t.includes('entertainment')||t.includes('pop-culture')) return 'Culture';
+  if(t.includes('economic')||t.includes('economy')) return 'Economic';
+  if(t.includes('business')||t.includes('financial')||t.includes('earnings')) return 'Business';
+  if(t.includes('geopolitical')||t.includes('world')||t.includes('global')) return 'Geopolitical';
+  if(t.includes('weather')) return 'Weather';
+  if(combined.includes('bitcoin')||combined.includes(' btc')||combined.includes('ethereum')||combined.includes(' eth')||combined.includes('solana')||combined.includes(' xrp')||combined.includes('crypto')||combined.includes('defi')) return 'Crypto';
+  if(combined.includes('election')||combined.includes('ballot')) return 'Election';
+  if(combined.includes('war')||combined.includes('ceasefire')||combined.includes('nato')||combined.includes('ukraine')||combined.includes('israel')||combined.includes('gaza')||combined.includes('geopolit')) return 'Geopolitical';
+  if(combined.includes('president')||combined.includes('senate')||combined.includes('congress')||combined.includes('minister')||combined.includes('governor')||combined.includes('parliament')) return 'Politics';
+  if(combined.includes('gdp')||combined.includes('inflation')||combined.includes('interest rate')||combined.includes('fed ')||combined.includes('recession')) return 'Economic';
+  if(combined.includes('stock')||combined.includes('market cap')||combined.includes('revenue')||combined.includes('ipo')||combined.includes('nasdaq')||combined.includes('earnings')) return 'Business';
+  if(combined.includes('ai ')||combined.includes('artificial intelligence')||combined.includes('openai')||combined.includes('gpt')||combined.includes('apple')||combined.includes('google')||combined.includes('microsoft')||combined.includes('meta ')||combined.includes('tesla')) return 'Tech';
+  if(combined.includes('oscar')||combined.includes('grammy')||combined.includes('movie')||combined.includes('award')||combined.includes('album')||combined.includes('singer')||combined.includes('actor')||combined.includes('celebrity')) return 'Culture';
+  if(combined.includes('nba')||combined.includes('nfl')||combined.includes('nhl')||combined.includes('mlb')||combined.includes('soccer')||combined.includes('football')||combined.includes('match')||combined.includes('champion')||combined.includes('world cup')||combined.includes('super bowl')||combined.includes('tennis')||combined.includes('golf')||combined.includes('mma')||combined.includes('cricket')||combined.includes('arsenal')||combined.includes('manchester')||combined.includes('playoff')) return 'Sports';
+  if(combined.includes('weather')||combined.includes('hurricane')||combined.includes('earthquake')||combined.includes('storm')) return 'Weather';
+  if(combined.includes('politics')||combined.includes('political')||combined.includes('policy')) return 'Politics';
   return 'Others';
 }
 
@@ -1510,7 +1621,7 @@ window.adminSyncPolymarket = async function(){
 
   try {
     while(true){
-      const url = `https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=${batchSize}&offset=${page * batchSize}&order=volume&ascending=false&volume_num_min=100`;
+      const url = `https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=${batchSize}&offset=${page * batchSize}&order=volume&ascending=false&volume_num_min=50`;
       toast(`Fetching page ${page + 1}...`, '');
       const data = await fetchWithProxyAdmin(url);
 
@@ -1553,7 +1664,12 @@ window.adminSyncPolymarket = async function(){
           outcomePricesArr = JSON.parse(pm.outcomePrices||'[]').map(p => parseFloat(p));
         } catch(e){}
 
-        const category = detectCategoryAdmin(pm.question);
+        let pmTagsAdmin = [];
+        try {
+          if(pm.tags) pmTagsAdmin = Array.isArray(pm.tags) ? pm.tags.map(t=>typeof t==='string'?t:(t.slug||t.name||'')) : [];
+          if(pm.category) pmTagsAdmin.push(pm.category);
+        } catch(e){}
+        const category = detectCategoryAdmin(pm.question, pmTagsAdmin);
         const imageUrl = pm.image || pm.icon || '';
 
         // check if exists
@@ -1611,7 +1727,7 @@ window.adminSyncPolymarket = async function(){
 
       if(data.length < batchSize) break;
       page++;
-      if(page >= 30) break; // max 3000 markets
+      if(page >= 20) break; // max 2000 markets per sync
     }
 
     toast(`✅ Sync done! ${imported} new markets, ${updated} updated.`, 'success');
@@ -1622,7 +1738,19 @@ window.adminSyncPolymarket = async function(){
   btn.disabled = false;
   btn.innerHTML = '🔄 Sync Polymarket';
 };
+window.setMarketFilter = function(filter){
+  _marketSourceFilter = filter;
+  ['all','crediplex','polymarket'].forEach(f=>{
+    const btn = document.getElementById('mf-'+f);
+    if(btn){
+      btn.style.background = f===filter ? '#2563eb' : 'transparent';
+      btn.style.color = f===filter ? 'white' : '#64748b';
+    }
+  });
+  renderMarketsTable();
+}
 
 </script>
 </body>
 </html>
+
