@@ -311,9 +311,16 @@ app.post('/api/payout', async (req, res) => {
 
     // Check withdrawal exists and is still pending
     const wdRef = db.collection('withdrawals').doc(withdrawalId);
-    const wdSnap = await wdRef.get();
 
-    if (!wdSnap.exists) {
+    // Retry up to 3 times — Firestore write from client may not be committed yet
+    let wdSnap = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      wdSnap = await wdRef.get();
+      if (wdSnap.exists) break;
+      await new Promise(r => setTimeout(r, 800));
+    }
+
+    if (!wdSnap || !wdSnap.exists) {
       return res.status(404).json({ success: false, error: 'Withdrawal not found.' });
     }
 
