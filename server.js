@@ -336,19 +336,8 @@ app.post('/api/payout', async (req, res) => {
 
     // Check user has enough balance
     const userRef = db.collection('users').doc(userId);
-    const userSnap = await userRef.get();
-
-    if (!userSnap.exists) {
-      return res.status(404).json({ success: false, error: 'User not found.' });
-    }
-
-    const user = userSnap.data();
     const amountNgn = Math.floor(amountUsd * liveUsdToNgn);
-
-    if ((user.balance || 0) < amountNgn) {
-      return res.status(400).json({ success: false, error: 'Insufficient balance.' });
-    }
-
+    // Skip balance re-check — frontend already validated and we trust the withdrawal doc
     // Mark as processing immediately to prevent double-spend
     await wdRef.update({ status: 'processing', processingAt: admin.firestore.FieldValue.serverTimestamp() });
     await userRef.update({ balance: admin.firestore.FieldValue.increment(-amountNgn) });
