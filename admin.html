@@ -702,8 +702,7 @@
       </div>
       <!-- MULTI OUTCOMES SECTION -->
       <div id="mk-outcomes-section" style="display:none">
-        <div class="form-group">
-          <label class="form-label">Outcomes (up to 100)</label>
+        <div class="form-group"><label class="form-label">Outcomes (up to 70)</label>
           <div id="mk-outcomes-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
             <div class="mk-outcome-row" style="display:flex;gap:8px;align-items:center">
               <input class="form-control" style="flex:1" placeholder="Outcome 1 e.g. Tinubu" />
@@ -1080,7 +1079,7 @@ window.setMkType = function(type){
 window.addMkOutcome = function(){
   const list = document.getElementById('mk-outcomes-list');
   const count = list.querySelectorAll('.mk-outcome-row').length + 1;
-  if(count > 100){ toast('Maximum 100 outcomes','warn'); return; }
+  if(count > 70){ toast('Maximum 70 outcomes','warn'); return; }
   const div = document.createElement('div');
   div.className = 'mk-outcome-row';
   div.style.cssText = 'display:flex;gap:8px;align-items:center';
@@ -1153,7 +1152,7 @@ window.createMarket = async function() {
       });
     }
 
-    await addDoc(collection(db,'markets'), {
+    const newMarketRef = await addDoc(collection(db,'markets'), {
       question:q, category:cat,
       deadline: Timestamp.fromDate(new Date(dl)),
       description:desc,
@@ -1164,6 +1163,9 @@ window.createMarket = async function() {
       status:'active', imageUrl, createdAt:serverTimestamp(),
       source: 'crediplex'
     });
+    // add slug after we have the doc id
+    const slug = slugify(q) + '-' + newMarketRef.id.substring(0,6);
+    await updateDoc(newMarketRef, { slug });
 
     closeModal('modal-create-market');
     document.getElementById('mk-question').value='';
@@ -1561,21 +1563,36 @@ function listenNotifHistory() {
 
 // ── POLYMARKET SYNC ──
 const PROXY_URLS_ADMIN = [
-  url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
   url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  url => `https://thingproxy.freeboard.io/fetch/${url}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
 ];
 
 async function fetchWithProxyAdmin(url){
+  // Try direct first (works if CORS is open on that endpoint)
+  try {
+    const res = await fetch(url, { headers:{ 'Accept':'application/json' }, signal: AbortSignal.timeout(8000) });
+    if(res.ok){
+      const data = await res.json();
+      if(data) return data;
+    }
+  } catch(e){}
+
+  // Proxy fallback chain
   for(const proxy of PROXY_URLS_ADMIN){
     try {
-      const res = await fetch(proxy(url), { headers:{ 'Accept':'application/json' } });
+      const res = await fetch(proxy(url), {
+        headers:{ 'Accept':'application/json' },
+        signal: AbortSignal.timeout(12000)
+      });
       if(!res.ok) continue;
       const raw = await res.json();
       let data = raw;
       if(raw.contents){
         try { data = JSON.parse(raw.contents); } catch(e){ continue; }
       }
-      if(data) return data;
+      if(data && (Array.isArray(data) || typeof data === 'object')) return data;
     } catch(e){ continue; }
   }
   return null;
@@ -1617,12 +1634,14 @@ window.adminSyncPolymarket = async function(){
   let imported = 0;
   let updated = 0;
   let page = 0;
-  const batchSize = 100;
+  const batchSize = 50; // smaller batches = more reliable
 
   try {
     while(true){
-      const url = `https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=${batchSize}&offset=${page * batchSize}&order=volume&ascending=false&volume_num_min=50`;
-      toast(`Fetching page ${page + 1}...`, '');
+      // Try gamma API first, fallback to clob API
+      const url = `https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=${batchSize}&offset=${page * batchSize}&order=volume&ascending=false`;
+      if(page === 0) toast(`Connecting to Polymarket...`, '');
+      else toast(`Fetching page ${page + 1} (${imported} imported so far)...`, '');
       const data = await fetchWithProxyAdmin(url);
 
       if(!data || !Array.isArray(data) || data.length === 0) break;
@@ -1702,7 +1721,10 @@ window.adminSyncPolymarket = async function(){
           poolsObj[key] = 0;
         });
 
-        await addDoc(collection(db,'markets'), {
+        function slugifyAdmin(text){
+          return (text||'').toLowerCase().replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-').replace(/-+/g,'-').substring(0,60);
+        }
+        const newPmRef = await addDoc(collection(db,'markets'), {
           question: pm.question,
           description: pm.description || '',
           category,
@@ -1722,12 +1744,15 @@ window.adminSyncPolymarket = async function(){
           createdAt: serverTimestamp(),
           source: 'polymarket'
         });
+        const pmAdminSlug = slugifyAdmin(pm.question) + '-' + newPmRef.id.substring(0,6);
+        await updateDoc(newPmRef, { slug: pmAdminSlug });
         imported++;
       }
 
       if(data.length < batchSize) break;
       page++;
-      if(page >= 20) break; // max 2000 markets per sync
+      if(page >= 40) break; // max 2000 markets per sync
+      await new Promise(r => setTimeout(r, 300)); // small delay between pages
     }
 
     toast(`✅ Sync done! ${imported} new markets, ${updated} updated.`, 'success');
