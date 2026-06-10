@@ -643,9 +643,9 @@ async function resolvePolymarketMarkets() {
   }
 }
 
-// Start the poller — runs every 60 seconds
-console.log('⏱️ Polymarket resolution poller started (every 60s)');
-setInterval(resolvePolymarketMarkets, 60 * 1000);
+// Start the poller — runs every 15 minutes
+console.log('⏱️ Polymarket resolution poller started (every 15min)');
+setInterval(resolvePolymarketMarkets, 15 * 60 * 1000);
 // Also run immediately on server start
 setTimeout(resolvePolymarketMarkets, 5000);
 const PORT = process.env.PORT || 3000;
