@@ -439,6 +439,215 @@ app.get('/api/live-rate', async (req, res) => {
 });
 
 // ── START SERVER ──
+// ────────────────────────────────────────────────
+// POLYMARKET AUTO-RESOLUTION POLLER
+// Runs every 60 seconds, resolves markets server-side
+// ────────────────────────────────────────────────
+
+const PROXY_URLS = [
+  url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+];
+
+async function fetchWithProxy(url) {
+  for (const proxy of PROXY_URLS) {
+    try {
+      const res = await fetch(proxy(url), {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!res.ok) continue;
+      const raw = await res.json();
+      let data = raw;
+      if (raw.contents) {
+        try { data = JSON.parse(raw.contents); } catch (e) { continue; }
+      }
+      if (data) return data;
+    } catch (e) { continue; }
+  }
+  return null;
+}
+
+async function resolvePolymarketMarkets() {
+  try {
+    // Fetch all active markets that have a polymarketId
+    const marketsSnap = await db.collection('markets')
+      .where('status', '==', 'active')
+      .get();
+
+    const polyMarkets = marketsSnap.docs.filter(d => d.data().polymarketId);
+    if (!polyMarkets.length) return;
+
+    console.log(`🔍 Checking ${polyMarkets.length} Polymarket markets for resolution...`);
+
+    for (const mktDoc of polyMarkets) {
+      const m = { id: mktDoc.id, ...mktDoc.data() };
+
+      try {
+        // Direct fetch (Railway has no CORS restriction)
+        let data = null;
+        try {
+          const res = await fetch(
+            `https://gamma-api.polymarket.com/markets/${m.polymarketId}`,
+            { signal: AbortSignal.timeout(8000) }
+          );
+          if (res.ok) data = await res.json();
+        } catch (e) {}
+
+        // Fallback to proxy
+        if (!data) {
+          data = await fetchWithProxy(`https://gamma-api.polymarket.com/markets/${m.polymarketId}`);
+        }
+
+        if (!data) continue;
+
+        const isResolved = data.resolved === true || data.closed === true;
+        if (!isResolved) continue;
+
+        // Determine winner
+        let winner = null;
+        let outcomesArr = ['Yes', 'No'];
+        try { outcomesArr = JSON.parse(data.outcomes || '["Yes","No"]'); } catch (e) {}
+
+        // Method 1: resolutionResult field
+        if (data.resolutionResult) {
+          const rr = data.resolutionResult;
+          const matchedOutcome = outcomesArr.find(
+            o => o.toLowerCase() === rr.toLowerCase()
+          );
+          if (matchedOutcome) winner = matchedOutcome.toUpperCase();
+          else winner = rr.toLowerCase().includes('yes') ? 'YES' : 'NO';
+        }
+
+        // Method 2: outcome prices (winning side = ~1.0)
+        if (!winner) {
+          try {
+            const prices = JSON.parse(data.outcomePrices || '[]');
+            const winIdx = prices.findIndex(p => parseFloat(p) >= 0.99);
+            if (winIdx >= 0 && outcomesArr[winIdx]) {
+              winner = outcomesArr[winIdx].toUpperCase();
+            }
+          } catch (e) {}
+        }
+
+        // Method 3: highest price
+        if (!winner) {
+          try {
+            const prices = JSON.parse(data.outcomePrices || '[]').map(p => parseFloat(p));
+            const maxIdx = prices.indexOf(Math.max(...prices));
+            if (maxIdx >= 0 && outcomesArr[maxIdx]) winner = outcomesArr[maxIdx].toUpperCase();
+          } catch (e) {}
+        }
+
+        if (!winner) continue;
+
+        // Get all pending bets for this market
+        const betsSnap = await db.collection('bets')
+          .where('marketId', '==', m.id)
+          .where('status', '==', 'pending')
+          .get();
+
+        const yesPool = m.yesPool || 0;
+        const noPool = m.noPool || 0;
+        let totalPool = yesPool + noPool;
+        let winningSidePool = winner === 'YES' ? yesPool : noPool;
+
+        // Handle multi-outcome pools
+        if (outcomesArr.length > 2) {
+          totalPool = m.totalPool || 0;
+          if (!totalPool) {
+            Object.keys(m)
+              .filter(k => k.startsWith('pool_'))
+              .forEach(k => { totalPool += Number(m[k] || 0); });
+          }
+          const matchedOutcome = outcomesArr.find(o =>
+            o.toLowerCase() === winner.toLowerCase() ||
+            o.toLowerCase().includes(winner.toLowerCase()) ||
+            winner.toLowerCase().includes(o.toLowerCase())
+          ) || winner;
+          const winKey = 'pool_' + matchedOutcome.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+          winningSidePool = Number(m[winKey] || 0);
+          winner = matchedOutcome.toUpperCase();
+        }
+
+        // Run payout transaction
+        await db.runTransaction(async tx => {
+          const mktRef = db.collection('markets').doc(m.id);
+          const mktNow = await tx.get(mktRef);
+          if (mktNow.data().status !== 'active') return; // already resolved
+
+          for (const betDoc of betsSnap.docs) {
+            const b = betDoc.data();
+            const betRef = db.collection('bets').doc(betDoc.id);
+            const betSide = (b.side || '').toUpperCase();
+
+            if (betSide === winner) {
+              const winAmt = winningSidePool > 0
+                ? Math.floor((totalPool * 0.90 / winningSidePool) * Number(b.amount || 0))
+                : Number(b.amount || 0);
+              const profit = winAmt - Number(b.amount || 0);
+
+              if (b.isBonus) {
+                // Bonus bet: only 5% of profit to withdrawal wallet
+                const bonusPayout = Math.floor(profit * 0.05);
+                tx.update(betRef, { status: 'won', winAmount: bonusPayout });
+                tx.update(db.collection('users').doc(b.uid), {
+                  balance: admin.firestore.FieldValue.increment(bonusPayout),
+                  wins: admin.firestore.FieldValue.increment(1),
+                  profit: admin.firestore.FieldValue.increment(bonusPayout)
+                });
+              } else {
+                tx.update(betRef, { status: 'won', winAmount: winAmt });
+                tx.update(db.collection('users').doc(b.uid), {
+                  balance: admin.firestore.FieldValue.increment(winAmt),
+                  wins: admin.firestore.FieldValue.increment(1),
+                  profit: admin.firestore.FieldValue.increment(profit)
+                });
+              }
+
+              const txRef = db.collection('transactions').doc();
+              tx.set(txRef, {
+                uid: b.uid,
+                type: 'win_payout',
+                amount: winAmt,
+                note: `Won: ${(m.question || '').substring(0, 60)}`,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+              });
+
+            } else {
+              // Loser
+              tx.update(betRef, { status: 'lost' });
+              tx.update(db.collection('users').doc(b.uid), {
+                losses: admin.firestore.FieldValue.increment(1),
+                profit: admin.firestore.FieldValue.increment(-Number(b.amount || 0))
+              });
+            }
+          }
+
+          tx.update(mktRef, {
+            status: 'resolved',
+            result: winner,
+            resolvedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        });
+
+        console.log(`✅ Resolved: "${(m.question || '').substring(0, 50)}" → ${winner} (${betsSnap.size} bets paid)`);
+
+      } catch (err) {
+        console.error(`❌ Error resolving market ${m.id}:`, err.message);
+      }
+    }
+
+  } catch (err) {
+    console.error('resolvePolymarketMarkets error:', err.message);
+  }
+}
+
+// Start the poller — runs every 60 seconds
+console.log('⏱️ Polymarket resolution poller started (every 60s)');
+setInterval(resolvePolymarketMarkets, 60 * 1000);
+// Also run immediately on server start
+setTimeout(resolvePolymarketMarkets, 5000);
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Crediplex server running on port ${PORT}`);
