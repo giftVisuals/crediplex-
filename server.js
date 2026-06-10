@@ -471,8 +471,10 @@ async function fetchWithProxy(url) {
 async function resolvePolymarketMarkets() {
   try {
     // Fetch all active markets that have a polymarketId
+    const now = admin.firestore.Timestamp.now();
     const marketsSnap = await db.collection('markets')
       .where('status', '==', 'active')
+      .where('deadline', '<=', now)
       .get();
 
     const polyMarkets = marketsSnap.docs.filter(d => d.data().polymarketId);
