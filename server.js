@@ -66,13 +66,15 @@ setInterval(refreshNgnRate, 15 * 60 * 1000);
 
 // ── HELPER: Call NOWPayments API ──
 async function npFetch(path, method = 'GET', body = null) {
-  const options = {
-    method,
-    headers: {
-      'x-api-key': NP_API_KEY,
-      'Content-Type': 'application/json'
-    }
+  const headers = {
+    'x-api-key': NP_API_KEY,
+    'Content-Type': 'application/json'
   };
+  // /payout endpoint requires Bearer JWT token
+  if (path.startsWith('/payout')) {
+    headers['Authorization'] = `Bearer ${process.env.NP_JWT_TOKEN}`;
+  }
+  const options = { method, headers };
   if (body) options.body = JSON.stringify(body);
 
   const res = await fetch(`${NP_BASE}${path}`, options);
