@@ -71,9 +71,6 @@ async function npFetch(path, method = 'GET', body = null) {
     'Content-Type': 'application/json'
   };
   // /payout endpoint requires Bearer JWT token
-  if (path.startsWith('/payout')) {
-    headers['Authorization'] = `Bearer ${process.env.NP_JWT_TOKEN}`;
-  }
   const options = { method, headers };
   if (body) options.body = JSON.stringify(body);
 
