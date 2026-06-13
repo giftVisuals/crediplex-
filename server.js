@@ -682,6 +682,212 @@ setTimeout(() => pollAllCopyRelations(db, admin), 30 * 1000);
 setInterval(() => pollAllCopyRelations(db, admin), 5 * 60 * 1000);
 console.log('🔄 Copy trade poller started (every 5 min)');
 
+// ─── AUTO POLYMARKET SYNC (every 2 minutes) ───────────────────
+async function autoSyncPolymarketMarkets() {
+  console.log('🔄 Auto-syncing Polymarket markets...');
+  let imported = 0;
+  let updated = 0;
+  let page = 0;
+  const batchSize = 100;
+
+  try {
+    // Pre-load existing polymarket IDs
+    const existingSnap = await db.collection('markets').where('source', '==', 'polymarket').get();
+    const existingPmIds = {};
+    existingSnap.forEach(d => {
+      const pmId = d.data().polymarketId;
+      if (pmId) existingPmIds[pmId] = d;
+    });
+
+    while (true) {
+      const url = `https://gamma-api.polymarket.com/events?active=true&closed=false&limit=${batchSize}&offset=${page * batchSize}&order=volume_24hr&ascending=false`;
+
+      let data = null;
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        if (res.ok) data = await res.json();
+      } catch (e) {
+        data = await fetchWithProxy(url);
+      }
+
+      if (!data || !Array.isArray(data) || data.length === 0) break;
+
+      // Flatten events → markets (THIS IS THE FIX for multi-outcome)
+      const allMarkets = [];
+      for (const event of data) {
+        if (event.markets && Array.isArray(event.markets)) {
+          for (const m of event.markets) {
+            if (!m.question) m.question = event.title || event.question;
+            if (!m.image) m.image = event.image;
+            if (!m.endDate) m.endDate = event.endDate;
+            if (!m.tags) m.tags = event.tags;
+            allMarkets.push(m);
+          }
+        } else if (event.question) {
+          allMarkets.push(event);
+        }
+      }
+
+      const writes = [];
+
+      for (const pm of allMarkets) {
+        if (!pm.question) continue;
+        if (pm.closed === true || pm.active === false) continue;
+
+        const pmId = String(pm.id || pm.conditionId || '');
+        if (!pmId) continue;
+
+        // Parse deadline
+        let deadline = null;
+        if (pm.endDate || pm.end_date_iso) {
+          const d = new Date(pm.endDate || pm.end_date_iso);
+          if (isNaN(d.getTime())) continue;
+          if (d < new Date()) continue;
+          deadline = admin.firestore.Timestamp.fromDate(d);
+        } else {
+          deadline = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+        }
+
+        // Parse outcomes (KEY FIX: preserve ALL outcomes from Polymarket)
+        let outcomesArr = ['Yes', 'No'];
+        try {
+          const parsed = JSON.parse(pm.outcomes || '[]');
+          if (Array.isArray(parsed) && parsed.length >= 2) outcomesArr = parsed;
+        } catch (e) {}
+
+        // Parse outcome prices
+        let outcomePricesArr = [];
+        try {
+          outcomePricesArr = JSON.parse(pm.outcomePrices || '[]').map(p => parseFloat(p));
+        } catch (e) {}
+
+        // Yes odds (first outcome price)
+        let yesOdds = 50;
+        if (outcomePricesArr[0]) yesOdds = Math.round(outcomePricesArr[0] * 100);
+
+        // Tags and category
+        let pmTags = [];
+        try {
+          if (pm.tags) pmTags = Array.isArray(pm.tags) ? pm.tags.map(t => typeof t === 'string' ? t : (t.slug || t.name || '')) : [];
+        } catch (e) {}
+
+        const category = detectCategoryAdmin(pm.question, pmTags);
+        const imageUrl = pm.image || pm.icon || '';
+
+        const existingDoc = existingPmIds[pmId];
+
+        if (existingDoc) {
+          const existing = existingDoc.data();
+          if (existing.status === 'active') {
+            const updateData = {
+              polymarketYesOdds: yesOdds,
+              polymarketVolume: pm.volume || 0,
+              deadline,
+              outcomes: JSON.stringify(outcomesArr),
+              outcomePrices: JSON.stringify(outcomePricesArr),
+              outcomeCount: outcomesArr.length,
+              question: pm.question,
+            };
+            if (imageUrl) updateData.imageUrl = imageUrl;
+            writes.push(existingDoc.ref.update(updateData));
+            updated++;
+          }
+          continue;
+        }
+
+        // Build pool keys for ALL outcomes
+        const poolsObj = { yesPool: 0, noPool: 0, totalPool: 0 };
+        outcomesArr.forEach(o => {
+          const key = 'pool_' + o.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+          poolsObj[key] = 0;
+        });
+
+        const slug = slugifyServer(pm.question) + '-' + pmId.substring(0, 6);
+
+        writes.push(
+          db.collection('markets').add({
+            question: pm.question,
+            description: pm.description || '',
+            category,
+            status: 'active',
+            yesPool: 0,
+            noPool: 0,
+            imageUrl,
+            polymarketId: pmId,
+            polymarketSlug: pm.slug || '',
+            polymarketVolume: pm.volume || 0,
+            polymarketYesOdds: yesOdds,
+            deadline,
+            outcomes: JSON.stringify(outcomesArr),
+            outcomePrices: JSON.stringify(outcomePricesArr),
+            outcomeCount: outcomesArr.length,
+            ...poolsObj,
+            slug,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            source: 'polymarket',
+          })
+        );
+        imported++;
+      }
+
+      // Execute writes in parallel
+      if (writes.length > 0) {
+        await Promise.all(writes);
+      }
+
+      if (data.length < batchSize) break;
+      page++;
+      if (page >= 20) break;
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    console.log(`✅ Auto-sync done: ${imported} new, ${updated} updated`);
+  } catch (err) {
+    console.error('autoSyncPolymarketMarkets error:', err.message);
+  }
+}
+
+function slugifyServer(text) {
+  return (text || '').toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 60);
+}
+
+function detectCategoryAdmin(question, tags) {
+  const q = (question || '').toLowerCase();
+  const t = (tags || []).join(' ').toLowerCase();
+  const combined = q + ' ' + t;
+  if (t.includes('sports') || t.includes('nba') || t.includes('nfl') || t.includes('soccer') || t.includes('tennis') || t.includes('golf') || t.includes('mma') || t.includes('cricket') || t.includes('esports')) return 'Sports';
+  if (t.includes('election')) return 'Election';
+  if (t.includes('politics') || t.includes('political')) return 'Politics';
+  if (t.includes('crypto') || t.includes('bitcoin') || t.includes('ethereum') || t.includes('defi')) return 'Crypto';
+  if (t.includes('tech') || t.includes('ai') || t.includes('technology')) return 'Tech';
+  if (t.includes('culture') || t.includes('entertainment')) return 'Culture';
+  if (t.includes('economic') || t.includes('economy')) return 'Economic';
+  if (t.includes('business') || t.includes('financial')) return 'Business';
+  if (t.includes('geopolitical') || t.includes('world')) return 'Geopolitical';
+  if (combined.includes('bitcoin') || combined.includes(' btc') || combined.includes('ethereum') || combined.includes('crypto')) return 'Crypto';
+  if (combined.includes('election') || combined.includes('ballot')) return 'Election';
+  if (combined.includes('war') || combined.includes('ceasefire') || combined.includes('nato') || combined.includes('ukraine') || combined.includes('israel') || combined.includes('gaza')) return 'Geopolitical';
+  if (combined.includes('president') || combined.includes('senate') || combined.includes('congress') || combined.includes('minister') || combined.includes('parliament')) return 'Politics';
+  if (combined.includes('gdp') || combined.includes('inflation') || combined.includes('interest rate') || combined.includes('recession')) return 'Economic';
+  if (combined.includes('stock') || combined.includes('ipo') || combined.includes('nasdaq') || combined.includes('earnings')) return 'Business';
+  if (combined.includes('ai ') || combined.includes('artificial intelligence') || combined.includes('openai') || combined.includes('apple') || combined.includes('google') || combined.includes('microsoft')) return 'Tech';
+  if (combined.includes('oscar') || combined.includes('grammy') || combined.includes('movie') || combined.includes('award') || combined.includes('celebrity')) return 'Culture';
+  if (combined.includes('nba') || combined.includes('nfl') || combined.includes('nhl') || combined.includes('soccer') || combined.includes('football') || combined.includes('champion') || combined.includes('world cup') || combined.includes('super bowl') || combined.includes('tennis') || combined.includes('golf') || combined.includes('mma') || combined.includes('cricket') || combined.includes('arsenal') || combined.includes('manchester') || combined.includes('playoff')) return 'Sports';
+  if (combined.includes('weather') || combined.includes('hurricane') || combined.includes('earthquake')) return 'Weather';
+  if (combined.includes('politics') || combined.includes('political') || combined.includes('policy')) return 'Politics';
+  return 'Others';
+}
+
+// Run sync on startup (after 10s) then every 2 minutes
+setTimeout(autoSyncPolymarketMarkets, 10 * 1000);
+setInterval(autoSyncPolymarketMarkets, 2 * 60 * 1000);
+console.log('🔄 Auto Polymarket sync started (every 2 min)');
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Crediplex server running on port ${PORT}`);
