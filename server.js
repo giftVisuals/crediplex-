@@ -1210,7 +1210,25 @@ app.post('/api/telegram-webhook', async (req, res) => {
       });
       return;
     }
+// ── /start ──
+    if (command === '/start') {
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      await db.collection('telegramVerifyCodes').add({
+        code,
+        chatId: chatId.toString(),
+        used: false,
+        expiresAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 10 * 60 * 1000)),
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
 
+      await sendTelegramMessage(chatId,
+        `👋 <b>Welcome to Crediplex!</b>\n\n` +
+        `Your verification code:\n\n<code>${code}</code>\n\n` +
+        `Paste this into Crediplex (Settings → Telegram) within 10 minutes to link your account.\n\n` +
+        `Use /help to see all commands.`
+      );
+      return;
+    }
     // ── /help ──
     if (command === '/help') {
       await sendTelegramMessage(chatId,
