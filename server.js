@@ -1123,10 +1123,20 @@ app.post('/api/telegram-webhook', async (req, res) => {
           .where('status', '==', 'active')
           .get();
         const lower = args.toLowerCase();
+        const queryWords = lower.split(/\s+/).filter(w => w.length > 2);
         const matches = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(m => m.question.toLowerCase().includes(lower))
-          .sort((a, b) => ((b.yesPool || 0) + (b.noPool || 0)) - ((a.yesPool || 0) + (a.noPool || 0)));
+          .filter(m => {
+            const q = (m.question || '').toLowerCase();
+            return queryWords.some(word => q.includes(word));
+          })
+          .map(m => {
+            const q = (m.question || '').toLowerCase();
+            let score = queryWords.filter(w => q.includes(w)).length * 10;
+            score += Math.log10(((m.yesPool || 0) + (m.noPool || 0)) + 1);
+            return { ...m, _score: score };
+          })
+          .sort((a, b) => b._score - a._score);
         if (matches.length) found = matches[0];
       } catch (e) {}
 
