@@ -1509,6 +1509,10 @@ async function registerTelegramWebhook() {
 
 setTimeout(registerTelegramWebhook, 3000);
 
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', service: 'Crediplex API', version: '2.0' });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Crediplex server running on port ${PORT}`);
