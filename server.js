@@ -951,21 +951,37 @@ async function fetchPolymarketPositions(address) {
 }
 
 async function fetchPolymarketMarket(query) {
+async function fetchPolymarketMarket(query) {
   const isUrl = query.startsWith('http');
   let searchTerm = query;
   if (isUrl) {
-    // Extract slug from URL like polymarket.com/event/bitcoin-150k
     const match = query.match(/\/event\/([^/?]+)/);
     if (match) searchTerm = match[1].replace(/-/g, ' ');
   }
   try {
     const res = await fetch(
-      `https://gamma-api.polymarket.com/markets?active=true&limit=5&search=${encodeURIComponent(searchTerm)}`,
+      `https://gamma-api.polymarket.com/markets?active=true&limit=20&search=${encodeURIComponent(searchTerm)}&order=volume&ascending=false`,
       { signal: AbortSignal.timeout(8000) }
     );
     if (!res.ok) return null;
     const data = await res.json();
-    return Array.isArray(data) && data.length ? data[0] : null;
+    if (!Array.isArray(data) || !data.length) return null;
+
+    // Score each result by keyword match quality
+    const queryWords = searchTerm.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    const scored = data.map(m => {
+      const q = (m.question || '').toLowerCase();
+      let score = 0;
+      queryWords.forEach(word => {
+        if (q.includes(word)) score += 10;
+        if (q.startsWith(word)) score += 5;
+      });
+      // Bonus for volume
+      score += Math.log10((m.volume || 1));
+      return { market: m, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return scored[0].market;
   } catch (e) { return null; }
 }
 
