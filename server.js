@@ -1034,76 +1034,97 @@ app.post('/api/telegram-webhook', async (req, res) => {
     const command = parts[0].toLowerCase().split('@')[0]; // strip @BotName
     const args = parts.slice(1).join(' ').trim();
 
-    // ── /start ──
-    if (command === '/start') {
-      // Check if args is a verify code (6 digits)
-      if (/^\d{6}$/.test(args)) {
-        // Link account via code
-        const codesSnap = await db.collection('telegramVerifyCodes')
-          .where('code', '==', args)
-          .where('used', '==', false)
-          .limit(1)
-          .get();
-
-        if (codesSnap.empty) {
-          await sendTelegramMessage(chatId,
-            '❌ <b>Invalid or expired code.</b>\n\nGenerate a new code from the Crediplex app under Copy Trade → Link Bot.'
-          );
-          return;
-        }
-
-        const codeDoc = codesSnap.docs[0];
-        const codeData = codeDoc.data();
-
-        // Check expiry
-        if (codeData.expiresAt.toDate() < new Date()) {
-          await sendTelegramMessage(chatId,
-            '⏰ <b>Code expired.</b>\n\nGenerate a new code from the Crediplex app.'
-          );
-          return;
-        }
-
-        const userId = codeData.userId;
-
-        // Mark code as used
-        await codeDoc.ref.update({ used: true });
-
-        // Save chatId to user
-        await db.collection('users').doc(userId).update({ telegramChatId: chatId.toString() });
-
-        // Get username
-        const userSnap = await db.collection('users').doc(userId).get();
-        const crediplexUsername = userSnap.exists ? userSnap.data().username : 'User';
-
+    // ── /market ──
+    if (command === '/market') {
+      if (!args) {
         await sendTelegramMessage(chatId,
-          `✅ <b>Account linked successfully!</b>\n\n` +
-          `Welcome, <b>${crediplexUsername}</b>! 🎉\n\n` +
-          `You'll now receive notifications here whenever a copy trade is placed for you.\n\n` +
-          `Use /help to see all available commands.`
+          `📊 <b>Usage:</b> /market &lt;keyword or link&gt;\n\n` +
+          `<b>Examples:</b>\n` +
+          `/market bitcoin 150k\n` +
+          `/market trump tariffs\n` +
+          `/market https://polymarket.com/event/bitcoin-150k`
         );
         return;
       }
 
-      // Normal /start
-      await sendTelegramMessage(chatId,
-        `👋 <b>Welcome to Crediplex Bot!</b>\n\n` +
-        `🎯 Predict markets. Copy top traders. Win big.\n\n` +
-        `<b>Commands:</b>\n` +
-        `/market — Search a prediction market\n` +
-        `/wallet — Look up a trader's stats\n` +
-        `/pnl — Detailed P&L breakdown\n` +
-        `/track — Track a market for alerts\n` +
-        `/untrack — Stop tracking a market\n` +
-        `/help — Support & info\n\n` +
-        `To link your Crediplex account, go to <b>Copy Trade → Link Bot</b> in the app.`,
-        {
-          reply_markup: JSON.stringify({
-            inline_keyboard: [[
-              { text: '🚀 Open Crediplex', url: 'https://crediplex.name.ng' }
-            ]]
+      await sendTelegramMessage(chatId, '🔍 Searching...');
+
+      // Try Crediplex markets first
+      let found = null;
+      try {
+        const snap = await db.collection('markets')
+          .where('status', '==', 'active')
+          .get();
+        const lower = args.toLowerCase();
+        const queryWords = lower.split(/\s+/).filter(w => w.length > 2);
+        const matches = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(m => {
+            const q = (m.question || '').toLowerCase();
+            return queryWords.some(word => q.includes(word));
           })
-        }
-      );
+          .map(m => {
+            const q = (m.question || '').toLowerCase();
+            let score = queryWords.filter(w => q.includes(w)).length * 10;
+            score += Math.log10(((m.yesPool || 0) + (m.noPool || 0)) + 1);
+            return { ...m, _score: score };
+          })
+          .sort((a, b) => b._score - a._score);
+        if (matches.length) found = matches[0];
+      } catch (e) {}
+
+      if (found) {
+        const total = (found.yesPool || 0) + (found.noPool || 0);
+        const yp = total > 0 ? Math.round((found.yesPool || 0) / total * 100) : 50;
+        const slug = found.slug || found.id;
+        await sendTelegramMessage(chatId,
+          `📊 <b>${found.question}</b>\n\n` +
+          `🟢 Yes: ${yp}%  🔴 No: ${100 - yp}%\n` +
+          `💰 Pool: ₦${Number(total).toLocaleString()}\n` +
+          `📂 Category: ${found.category || 'Others'}\n` +
+          `🕐 Status: ${found.status}`,
+          {
+            reply_markup: JSON.stringify({
+              inline_keyboard: [[
+                { text: '🎯 Bet on Crediplex', url: `https://crediplex.name.ng/market/${slug}` }
+              ]]
+            })
+          }
+        );
+        return;
+      }
+
+      // Try Polymarket
+      const pmMarket = await fetchPolymarketMarket(args);
+      if (pmMarket) {
+        let yesOdds = 50;
+        try {
+          const prices = JSON.parse(pmMarket.outcomePrices || '[]');
+          if (prices[0]) yesOdds = Math.round(parseFloat(prices[0]) * 100);
+        } catch (e) {}
+
+        const volume = pmMarket.volume ? `$${Number(pmMarket.volume).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'N/A';
+        const pmUrl = pmMarket.slug ? `https://polymarket.com/event/${pmMarket.slug}` : 'https://polymarket.com';
+
+        await sendTelegramMessage(chatId,
+          `📊 <b>${pmMarket.question}</b>\n\n` +
+          `🟢 Yes: ${yesOdds}%  🔴 No: ${100 - yesOdds}%\n` +
+          `💰 Volume: ${volume}\n` +
+          `🌍 Source: Polymarket\n` +
+          `📂 Category: ${pmMarket.category || 'Others'}`,
+          {
+            reply_markup: JSON.stringify({
+              inline_keyboard: [[
+                { text: '🎯 Trade on Crediplex', url: 'https://crediplex.name.ng/markets' },
+                { text: '🌍 View on Polymarket', url: pmUrl }
+              ]]
+            })
+          }
+        );
+        return;
+      }
+
+      await sendTelegramMessage(chatId, '❌ No market found for that search. Try different keywords.');
       return;
     }
 
