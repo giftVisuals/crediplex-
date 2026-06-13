@@ -866,10 +866,9 @@ function detectCategoryAdmin(question, tags) {
 }
 
 // Run sync on startup (after 10s) then every 2 minutes
-setTimeout(autoSyncPolymarketMarkets, 10 * 1000);
-setInterval(autoSyncPolymarketMarkets, 2 * 60 * 1000);
-console.log('🔄 Auto Polymarket sync started (every 2 min)');
-
+setTimeout(autoSyncPolymarketMarkets, 30 * 1000);
+setInterval(autoSyncPolymarketMarkets, 30 * 60 * 1000);
+console.log('🔄 Auto Polymarket sync started (every 30 min)');
 // ─── TELEGRAM BOT COMMAND HANDLER ────────────────────────────
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
