@@ -884,28 +884,60 @@ async function sendTelegramMessage(chatId, text, extra = {}) {
 }
 
 // ─── VERIFICATION CODE SYSTEM ─────────────────────────────────
-// POST /api/generate-verify-code
-// Frontend calls this → we store a 6-digit code in Firestore linked to userId
-app.post('/api/generate-verify-code', async (req, res) => {
+// When user starts the bot, bot generates a code and stores it linked to chatId
+// User then pastes that code into Crediplex app to link account
+
+// POST /api/verify-telegram-code
+// Called by frontend with { userId, code }
+app.post('/api/verify-telegram-code', async (req, res) => {
   try {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ success: false, error: 'Missing userId' });
+    const { userId, code } = req.body;
+    if (!userId || !code) return res.status(400).json({ success: false, error: 'Missing fields' });
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const snap = await db.collection('telegramVerifyCodes')
+      .where('code', '==', code.trim())
+      .where('used', '==', false)
+      .limit(1)
+      .get();
 
-    await db.collection('telegramVerifyCodes').doc(userId).set({
-      code,
-      userId,
-      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-      used: false,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
+    if (snap.empty) return res.json({ success: false, error: 'Invalid or expired code' });
 
-    res.json({ success: true, code });
+    const codeDoc = snap.docs[0];
+    const codeData = codeDoc.data();
+
+    if (codeData.expiresAt.toDate() < new Date()) {
+      return res.json({ success: false, error: 'Code expired. Start the bot again to get a new code.' });
+    }
+
+    const chatId = codeData.chatId;
+
+    // Mark code as used
+    await codeDoc.ref.update({ used: true, linkedUserId: userId });
+
+    // Save chatId to user document
+    await db.collection('users').doc(userId).update({ telegramChatId: chatId.toString() });
+
+    // Get user info to send welcome message
+    const userSnap = await db.collection('users').doc(userId).get();
+    const crediplexUsername = userSnap.exists ? userSnap.data().username : 'User';
+
+    // Send confirmation to Telegram
+    await sendTelegramMessage(chatId,
+      `✅ <b>Account linked successfully!</b>\n\n` +
+      `Welcome, <b>${crediplexUsername}</b>! 🎉\n\n` +
+      `You'll now receive notifications here whenever a copy trade is placed for you.\n\n` +
+      `Use /help to see all available commands.`
+    );
+
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// Legacy endpoint kept for compatibility
+app.post('/api/generate-verify-code', async (req, res) => {
+  res.json({ success: false, error: 'Use the Telegram bot /start command to get your code instead.' });
 });
 
 // ─── POLYMARKET FETCH HELPERS ─────────────────────────────────
