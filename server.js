@@ -871,9 +871,6 @@ setInterval(autoSyncPolymarketMarkets, 2 * 60 * 1000);
 console.log('🔄 Auto Polymarket sync started (every 2 min)');
 
 // ─── TELEGRAM BOT COMMAND HANDLER ────────────────────────────
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
-
 async function sendTelegramMessage(chatId, text, extra = {}) {
   try {
     await fetch(`${TELEGRAM_API}/sendMessage`, {
