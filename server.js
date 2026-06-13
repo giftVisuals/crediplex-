@@ -649,6 +649,39 @@ console.log('⏱️ Polymarket resolution poller started (every 15min)');
 setInterval(resolvePolymarketMarkets, 15 * 60 * 1000);
 // Also run immediately on server start
 setTimeout(resolvePolymarketMarkets, 5000);
+// ─── COPY TRADE POLLER + TELEGRAM ────────────────────────────
+const { pollAllCopyRelations, sendTelegram } = require('./copytrader');
+
+app.post('/api/telegram-test', async (req, res) => {
+  const { chatId, username } = req.body;
+  if (!chatId) return res.json({ success: false });
+  await sendTelegram(chatId,
+    `👋 <b>Hi ${username}!</b>\n\nYour Telegram is now linked to Crediplex.\n\nYou'll get a message here every time a copy trade is auto-placed for you. 🎯`
+  );
+  res.json({ success: true });
+});
+
+app.post('/api/telegram-webhook', async (req, res) => {
+  res.json({ ok: true });
+  try {
+    const message = req.body?.message;
+    if (!message) return;
+    const chatId = message.chat?.id;
+    const text = message.text || '';
+    if (text.startsWith('/start')) {
+      await sendTelegram(chatId,
+        `👋 <b>Welcome to Crediplex Copy Bot!</b>\n\n` +
+        `Your Chat ID is: <code>${chatId}</code>\n\n` +
+        `Copy this number and paste it in the Crediplex app under <b>Copy Trade → Link Bot</b> to receive trade notifications.`
+      );
+    }
+  } catch(e) { console.log('Webhook error:', e.message); }
+});
+
+setTimeout(() => pollAllCopyRelations(db, admin), 30 * 1000);
+setInterval(() => pollAllCopyRelations(db, admin), 5 * 60 * 1000);
+console.log('🔄 Copy trade poller started (every 5 min)');
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Crediplex server running on port ${PORT}`);
