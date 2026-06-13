@@ -888,6 +888,620 @@ setTimeout(autoSyncPolymarketMarkets, 10 * 1000);
 setInterval(autoSyncPolymarketMarkets, 2 * 60 * 1000);
 console.log('🔄 Auto Polymarket sync started (every 2 min)');
 
+// ─── TELEGRAM BOT COMMAND HANDLER ────────────────────────────
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
+
+async function sendTelegramMessage(chatId, text, extra = {}) {
+  try {
+    await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', ...extra })
+    });
+  } catch (e) { console.log('Telegram send error:', e.message); }
+}
+
+// ─── VERIFICATION CODE SYSTEM ─────────────────────────────────
+// POST /api/generate-verify-code
+// Frontend calls this → we store a 6-digit code in Firestore linked to userId
+app.post('/api/generate-verify-code', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ success: false, error: 'Missing userId' });
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await db.collection('telegramVerifyCodes').doc(userId).set({
+      code,
+      userId,
+      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+      used: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.json({ success: true, code });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── POLYMARKET FETCH HELPERS ─────────────────────────────────
+async function fetchPolymarketTrader(addressOrUsername) {
+  const isAddress = addressOrUsername.startsWith('0x');
+  const urls = isAddress
+    ? [
+        `https://gamma-api.polymarket.com/profiles?address=${addressOrUsername}`,
+        `https://data-api.polymarket.com/profiles?user=${addressOrUsername}`
+      ]
+    : [
+        `https://gamma-api.polymarket.com/profiles?name=${encodeURIComponent(addressOrUsername)}`,
+        `https://gamma-api.polymarket.com/profiles?search=${encodeURIComponent(addressOrUsername)}`
+      ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const profile = Array.isArray(data) ? data[0] : data;
+      if (profile && (profile.address || profile.proxyWallet)) return profile;
+    } catch (e) { continue; }
+  }
+  return null;
+}
+
+async function fetchPolymarketPositions(address) {
+  const urls = [
+    `https://data-api.polymarket.com/positions?user=${address}&limit=10`,
+    `https://gamma-api.polymarket.com/positions?user=${address}&limit=10`
+  ];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (Array.isArray(data) && data.length) return data;
+      if (data.positions) return data.positions;
+    } catch (e) { continue; }
+  }
+  return [];
+}
+
+async function fetchPolymarketMarket(query) {
+  const isUrl = query.startsWith('http');
+  let searchTerm = query;
+  if (isUrl) {
+    // Extract slug from URL like polymarket.com/event/bitcoin-150k
+    const match = query.match(/\/event\/([^/?]+)/);
+    if (match) searchTerm = match[1].replace(/-/g, ' ');
+  }
+  try {
+    const res = await fetch(
+      `https://gamma-api.polymarket.com/markets?active=true&limit=5&search=${encodeURIComponent(searchTerm)}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data) && data.length ? data[0] : null;
+  } catch (e) { return null; }
+}
+
+// ─── TELEGRAM WEBHOOK ─────────────────────────────────────────
+app.post('/api/telegram-webhook', async (req, res) => {
+  res.json({ ok: true }); // Always respond fast to Telegram
+
+  try {
+    const message = req.body?.message || req.body?.edited_message;
+    if (!message) return;
+
+    const chatId = message.chat?.id;
+    const text = (message.text || '').trim();
+    const username = message.from?.username || message.from?.first_name || 'User';
+
+    if (!text.startsWith('/')) return;
+
+    const parts = text.split(/\s+/);
+    const command = parts[0].toLowerCase().split('@')[0]; // strip @BotName
+    const args = parts.slice(1).join(' ').trim();
+
+    // ── /start ──
+    if (command === '/start') {
+      // Check if args is a verify code (6 digits)
+      if (/^\d{6}$/.test(args)) {
+        // Link account via code
+        const codesSnap = await db.collection('telegramVerifyCodes')
+          .where('code', '==', args)
+          .where('used', '==', false)
+          .limit(1)
+          .get();
+
+        if (codesSnap.empty) {
+          await sendTelegramMessage(chatId,
+            '❌ <b>Invalid or expired code.</b>\n\nGenerate a new code from the Crediplex app under Copy Trade → Link Bot.'
+          );
+          return;
+        }
+
+        const codeDoc = codesSnap.docs[0];
+        const codeData = codeDoc.data();
+
+        // Check expiry
+        if (codeData.expiresAt.toDate() < new Date()) {
+          await sendTelegramMessage(chatId,
+            '⏰ <b>Code expired.</b>\n\nGenerate a new code from the Crediplex app.'
+          );
+          return;
+        }
+
+        const userId = codeData.userId;
+
+        // Mark code as used
+        await codeDoc.ref.update({ used: true });
+
+        // Save chatId to user
+        await db.collection('users').doc(userId).update({ telegramChatId: chatId.toString() });
+
+        // Get username
+        const userSnap = await db.collection('users').doc(userId).get();
+        const crediplexUsername = userSnap.exists ? userSnap.data().username : 'User';
+
+        await sendTelegramMessage(chatId,
+          `✅ <b>Account linked successfully!</b>\n\n` +
+          `Welcome, <b>${crediplexUsername}</b>! 🎉\n\n` +
+          `You'll now receive notifications here whenever a copy trade is placed for you.\n\n` +
+          `Use /help to see all available commands.`
+        );
+        return;
+      }
+
+      // Normal /start
+      await sendTelegramMessage(chatId,
+        `👋 <b>Welcome to Crediplex Bot!</b>\n\n` +
+        `🎯 Predict markets. Copy top traders. Win big.\n\n` +
+        `<b>Commands:</b>\n` +
+        `/market — Search a prediction market\n` +
+        `/wallet — Look up a trader's stats\n` +
+        `/pnl — Detailed P&L breakdown\n` +
+        `/track — Track a market for alerts\n` +
+        `/untrack — Stop tracking a market\n` +
+        `/help — Support & info\n\n` +
+        `To link your Crediplex account, go to <b>Copy Trade → Link Bot</b> in the app.`,
+        {
+          reply_markup: JSON.stringify({
+            inline_keyboard: [[
+              { text: '🚀 Open Crediplex', url: 'https://crediplex.name.ng' }
+            ]]
+          })
+        }
+      );
+      return;
+    }
+
+    // ── /help ──
+    if (command === '/help') {
+      await sendTelegramMessage(chatId,
+        `📞 <b>Crediplex Support</b>\n\n` +
+        `📧 Email: care@crediplex.name.ng\n` +
+        `🌐 Website: crediplex.name.ng\n\n` +
+        `<b>All Commands:</b>\n` +
+        `/market &lt;keyword or link&gt; — Find a market\n` +
+        `/wallet &lt;address or username&gt; — Trader stats\n` +
+        `/pnl &lt;address or username&gt; — P&L breakdown\n` +
+        `/track &lt;address or username&gt; — Track a wallet\n` +
+        `/untrack — Stop tracking a wallet\n\n` +
+        `💬 For account issues, email us directly.`,
+        {
+          reply_markup: JSON.stringify({
+            inline_keyboard: [[
+              { text: '🌐 crediplex.name.ng', url: 'https://crediplex.name.ng' },
+              { text: '📧 Email Support', url: 'mailto:care@crediplex.name.ng' }
+            ]]
+          })
+        }
+      );
+      return;
+    }
+
+    // ── /market ──
+    if (command === '/market') {
+      if (!args) {
+        await sendTelegramMessage(chatId,
+          `📊 <b>Usage:</b> /market &lt;keyword or link&gt;\n\n` +
+          `<b>Examples:</b>\n` +
+          `/market bitcoin 150k\n` +
+          `/market trump tariffs\n` +
+          `/market https://polymarket.com/event/bitcoin-150k`
+        );
+        return;
+      }
+
+      await sendTelegramMessage(chatId, '🔍 Searching...');
+
+      // Try Crediplex markets first
+      let found = null;
+      try {
+        const snap = await db.collection('markets')
+          .where('status', '==', 'active')
+          .get();
+        const lower = args.toLowerCase();
+        const matches = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(m => m.question.toLowerCase().includes(lower))
+          .sort((a, b) => ((b.yesPool || 0) + (b.noPool || 0)) - ((a.yesPool || 0) + (a.noPool || 0)));
+        if (matches.length) found = matches[0];
+      } catch (e) {}
+
+      if (found) {
+        const total = (found.yesPool || 0) + (found.noPool || 0);
+        const yp = total > 0 ? Math.round((found.yesPool || 0) / total * 100) : 50;
+        const slug = found.slug || found.id;
+        await sendTelegramMessage(chatId,
+          `📊 <b>${found.question}</b>\n\n` +
+          `🟢 Yes: ${yp}%  🔴 No: ${100 - yp}%\n` +
+          `💰 Pool: ₦${Number(total).toLocaleString()}\n` +
+          `📂 Category: ${found.category || 'Others'}\n` +
+          `🕐 Status: ${found.status}`,
+          {
+            reply_markup: JSON.stringify({
+              inline_keyboard: [[
+                { text: '🎯 Bet on Crediplex', url: `https://crediplex.name.ng/market/${slug}` }
+              ]]
+            })
+          }
+        );
+        return;
+      }
+
+      // Try Polymarket
+      const pmMarket = await fetchPolymarketMarket(args);
+      if (pmMarket) {
+        let yesOdds = 50;
+        try {
+          const prices = JSON.parse(pmMarket.outcomePrices || '[]');
+          if (prices[0]) yesOdds = Math.round(parseFloat(prices[0]) * 100);
+        } catch (e) {}
+
+        const volume = pmMarket.volume ? `$${Number(pmMarket.volume).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'N/A';
+        const pmUrl = pmMarket.slug ? `https://polymarket.com/event/${pmMarket.slug}` : 'https://polymarket.com';
+
+        await sendTelegramMessage(chatId,
+          `📊 <b>${pmMarket.question}</b>\n\n` +
+          `🟢 Yes: ${yesOdds}%  🔴 No: ${100 - yesOdds}%\n` +
+          `💰 Volume: ${volume}\n` +
+          `🌍 Source: Polymarket\n` +
+          `📂 Category: ${pmMarket.category || 'Others'}`,
+          {
+            reply_markup: JSON.stringify({
+              inline_keyboard: [[
+                { text: '🎯 Trade on Crediplex', url: 'https://crediplex.name.ng/markets' },
+                { text: '🌍 View on Polymarket', url: pmUrl }
+              ]]
+            })
+          }
+        );
+        return;
+      }
+
+      await sendTelegramMessage(chatId, '❌ No market found for that search. Try different keywords.');
+      return;
+    }
+
+    // ── /wallet ──
+    if (command === '/wallet') {
+      if (!args) {
+        await sendTelegramMessage(chatId,
+          `💼 <b>Usage:</b> /wallet &lt;address or username&gt;\n\n` +
+          `<b>Examples:</b>\n` +
+          `/wallet 0x56687bf447db...\n` +
+          `/wallet Theo4`
+        );
+        return;
+      }
+
+      await sendTelegramMessage(chatId, '🔍 Looking up trader...');
+      await handleWalletCommand(chatId, args);
+      return;
+    }
+
+    // ── /pnl ──
+    if (command === '/pnl') {
+      if (!args) {
+        await sendTelegramMessage(chatId,
+          `📈 <b>Usage:</b> /pnl &lt;address or username&gt;\n\n` +
+          `<b>Examples:</b>\n` +
+          `/pnl 0x56687bf447db...\n` +
+          `/pnl Theo4`
+        );
+        return;
+      }
+
+      await sendTelegramMessage(chatId, '🔍 Fetching P&L breakdown...');
+      await handlePnlCommand(chatId, args);
+      return;
+    }
+
+    // ── /track ──
+    if (command === '/track') {
+      if (!args) {
+        await sendTelegramMessage(chatId,
+          `📍 <b>Usage:</b> /track &lt;address or username&gt;\n\n` +
+          `<b>Example:</b>\n` +
+          `/track 0x56687bf447db...\n` +
+          `/track Theo4\n\n` +
+          `You'll get notified when this wallet makes a trade.`
+        );
+        return;
+      }
+
+      // Resolve to address
+      let address = args;
+      if (!args.startsWith('0x')) {
+        const profile = await fetchPolymarketTrader(args);
+        if (!profile) {
+          await sendTelegramMessage(chatId, `❌ Trader <b>${args}</b> not found on Polymarket.`);
+          return;
+        }
+        address = profile.proxyWallet || profile.address;
+      }
+
+      // Save to tracked_wallets collection
+      await db.collection('telegramTrackedWallets').doc(`${chatId}_${address}`).set({
+        chatId: chatId.toString(),
+        address,
+        query: args,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      await sendTelegramMessage(chatId,
+        `✅ <b>Now tracking:</b>\n<code>${address}</code>\n\n` +
+        `You'll be notified of new trades.\n` +
+        `Use /untrack to stop.`
+      );
+      return;
+    }
+
+    // ── /untrack ──
+    if (command === '/untrack') {
+      const snap = await db.collection('telegramTrackedWallets')
+        .where('chatId', '==', chatId.toString())
+        .get();
+
+      if (snap.empty) {
+        await sendTelegramMessage(chatId, `ℹ️ You're not tracking any wallets.`);
+        return;
+      }
+
+      const wallets = snap.docs.map(d => d.data());
+
+      // Show list with inline buttons
+      const buttons = wallets.map(w => [{
+        text: `❌ ${w.query || w.address.substring(0, 16) + '...'}`,
+        callback_data: `untrack_${w.address}`
+      }]);
+
+      await sendTelegramMessage(chatId,
+        `📍 <b>Your tracked wallets:</b>\nTap to untrack:`,
+        {
+          reply_markup: JSON.stringify({ inline_keyboard: buttons })
+        }
+      );
+      return;
+    }
+
+    // ── Unknown command ──
+    await sendTelegramMessage(chatId,
+      `❓ Unknown command. Use /help to see all commands.`
+    );
+
+  } catch (err) {
+    console.error('Telegram webhook error:', err.message);
+  }
+});
+
+// ─── CALLBACK QUERY HANDLER (inline button taps) ──────────────
+app.post('/api/telegram-callback', async (req, res) => {
+  res.json({ ok: true });
+  try {
+    const query = req.body?.callback_query;
+    if (!query) return;
+
+    const chatId = query.message?.chat?.id;
+    const data = query.data;
+
+    // Answer the callback to remove loading spinner
+    await fetch(`${TELEGRAM_API}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: query.id })
+    });
+
+    if (data?.startsWith('untrack_')) {
+      const address = data.replace('untrack_', '');
+      await db.collection('telegramTrackedWallets').doc(`${chatId}_${address}`).delete();
+      await sendTelegramMessage(chatId,
+        `✅ Stopped tracking <code>${address.substring(0, 20)}...</code>`
+      );
+    }
+  } catch (e) { console.log('Callback error:', e.message); }
+});
+
+// ─── WALLET COMMAND HANDLER ───────────────────────────────────
+async function handleWalletCommand(chatId, query) {
+  // Try Crediplex first
+  try {
+    const usersSnap = await db.collection('users')
+      .where('username', '==', query)
+      .limit(1)
+      .get();
+
+    if (!usersSnap.empty) {
+      const u = usersSnap.docs[0].data();
+      const wr = u.totalBets > 0 ? Math.round((u.wins || 0) / u.totalBets * 100) : 0;
+      const profitSign = (u.profit || 0) >= 0 ? '+' : '';
+      const profitEmoji = (u.profit || 0) >= 0 ? '🟢' : '🔴';
+
+      await sendTelegramMessage(chatId,
+        `👤 <b>${u.username}</b>  [Crediplex]\n\n` +
+        `💰 P&L: ${profitSign}₦${Math.abs(u.profit || 0).toLocaleString()} ${profitEmoji}\n` +
+        `📊 Total Bets: ${u.totalBets || 0}\n` +
+        `✅ Wins: ${u.wins || 0}  ❌ Losses: ${u.losses || 0}\n` +
+        `🎯 Win Rate: ${wr}%\n` +
+        `💵 Balance: ₦${(u.balance || 0).toLocaleString()}`,
+        {
+          reply_markup: JSON.stringify({
+            inline_keyboard: [[
+              { text: '📈 View on Crediplex', url: 'https://crediplex.name.ng/copy-trade' }
+            ]]
+          })
+        }
+      );
+      return;
+    }
+  } catch (e) {}
+
+  // Try Polymarket
+  const profile = await fetchPolymarketTrader(query);
+  if (!profile) {
+    await sendTelegramMessage(chatId,
+      `❌ Trader <b>${query}</b> not found.\n\nTry using their full 0x wallet address.`
+    );
+    return;
+  }
+
+  const name = profile.name || profile.pseudonym || profile.username ||
+    (profile.address ? profile.address.substring(0, 8) + '...' : query);
+  const profit = parseFloat(profile.profitAndLoss || profile.pnl || profile.profit || 0);
+  const volume = parseFloat(profile.volume || profile.totalVolume || 0);
+  const totalTrades = profile.numTrades || profile.numPositions || 0;
+  const profitSign = profit >= 0 ? '+' : '';
+  const profitEmoji = profit >= 0 ? '🟢' : '🔴';
+  const address = profile.proxyWallet || profile.address || '';
+
+  const positions = await fetchPolymarketPositions(address);
+  const openPositions = positions.filter(p => p.size > 0 || p.currentValue > 0);
+
+  let biggestWins = '';
+  if (profile.biggestWins || profile.topPositions) {
+    const wins = profile.biggestWins || profile.topPositions || [];
+    biggestWins = wins.slice(0, 3).map(w => {
+      const title = (w.title || w.market || '').substring(0, 45);
+      const pnl = w.pnl || w.profit || 0;
+      return `  ${title}…  ${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(0)}`;
+    }).join('\n');
+  }
+
+  const weekPnl = parseFloat(profile.weekPnl || profile.profitAndLoss7d || 0);
+  const weekSign = weekPnl >= 0 ? '+' : '';
+  const weekEmoji = weekPnl >= 0 ? '🟢' : '🔴';
+
+  await sendTelegramMessage(chatId,
+    `🟢 <b>${name}</b>\n` +
+    `📅 Trades: ${totalTrades}\n\n` +
+    `💰 All-time PnL    ${profitSign}$${Math.abs(profit).toLocaleString('en-US', { maximumFractionDigits: 0 })}\n` +
+    `📊 Volume          $${(volume / 1000).toFixed(1)}K\n` +
+    (weekPnl !== 0 ? `📈 This week       ${weekSign}$${Math.abs(weekPnl).toFixed(0)} ${weekEmoji}\n` : '') +
+    (biggestWins ? `\n🏆 <b>Biggest wins:</b>\n${biggestWins}\n` : '') +
+    `\n📍 ${openPositions.length} open position${openPositions.length !== 1 ? 's' : ''}\n` +
+    `<i>Powered by Crediplex</i>`,
+    {
+      reply_markup: JSON.stringify({
+        inline_keyboard: [[
+          { text: '📊 See Positions', callback_data: `positions_${address}` },
+          { text: '🎯 Copy Trade', url: `https://crediplex.name.ng/copy-trade` }
+        ]]
+      })
+    }
+  );
+}
+
+// ─── PNL COMMAND HANDLER ──────────────────────────────────────
+async function handlePnlCommand(chatId, query) {
+  const profile = await fetchPolymarketTrader(query);
+  if (!profile) {
+    // Try Crediplex
+    try {
+      const snap = await db.collection('users').where('username', '==', query).limit(1).get();
+      if (!snap.empty) {
+        const u = snap.docs[0].data();
+        const betsSnap = await db.collection('bets')
+          .where('uid', '==', snap.docs[0].id)
+          .where('status', 'in', ['won', 'lost'])
+          .get();
+
+        const bets = betsSnap.docs.map(d => d.data());
+        const won = bets.filter(b => b.status === 'won');
+        const lost = bets.filter(b => b.status === 'lost');
+        const totalProfit = won.reduce((s, b) => s + ((b.winAmount || 0) - (b.amount || 0)), 0)
+          - lost.reduce((s, b) => s + (b.amount || 0), 0);
+
+        await sendTelegramMessage(chatId,
+          `📈 <b>P&L Breakdown — ${u.username}</b> [Crediplex]\n\n` +
+          `💰 Total P&L: ${totalProfit >= 0 ? '+' : ''}₦${Math.abs(totalProfit).toLocaleString()}\n` +
+          `✅ Winning bets: ${won.length}\n` +
+          `❌ Losing bets: ${lost.length}\n` +
+          `📊 Total closed: ${bets.length}\n` +
+          `🎯 Win rate: ${bets.length > 0 ? Math.round(won.length / bets.length * 100) : 0}%`
+        );
+        return;
+      }
+    } catch (e) {}
+
+    await sendTelegramMessage(chatId,
+      `❌ Trader <b>${query}</b> not found.`
+    );
+    return;
+  }
+
+  const name = profile.name || profile.pseudonym || query;
+  const profit = parseFloat(profile.profitAndLoss || profile.pnl || 0);
+  const volume = parseFloat(profile.volume || 0);
+  const totalTrades = profile.numTrades || 0;
+  const wr = profile.winRate ? Math.round(parseFloat(profile.winRate) * 100) : null;
+
+  // Build last-14-day breakdown if available
+  const profitSign = profit >= 0 ? '+' : '';
+  const profitEmoji = profit >= 0 ? '📈' : '📉';
+
+  await sendTelegramMessage(chatId,
+    `${profitEmoji} <b>P&L Breakdown — ${name}</b>\n\n` +
+    `💰 All-time P&L: ${profitSign}$${Math.abs(profit).toLocaleString('en-US', { maximumFractionDigits: 0 })}\n` +
+    `📊 Total Volume: $${(volume / 1000).toFixed(1)}K\n` +
+    `🔢 Total Trades: ${totalTrades}\n` +
+    (wr !== null ? `🎯 Win Rate: ${wr}%\n` : '') +
+    `\n<i>Full chart available on Crediplex</i>`,
+    {
+      reply_markup: JSON.stringify({
+        inline_keyboard: [[
+          { text: '📊 Full Profile', url: `https://crediplex.name.ng/copy-trade` }
+        ]]
+      })
+    }
+  );
+}
+
+// ─── REGISTER TELEGRAM WEBHOOK ON STARTUP ────────────────────
+async function registerTelegramWebhook() {
+  const serverUrl = process.env.SERVER_URL || 'https://crediplex-production.up.railway.app';
+  try {
+    const res = await fetch(`${TELEGRAM_API}/setWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: `${serverUrl}/api/telegram-webhook`,
+        allowed_updates: ['message', 'callback_query']
+      })
+    });
+    const data = await res.json();
+    console.log('✅ Telegram webhook registered:', data.description || data.result);
+  } catch (e) {
+    console.log('❌ Telegram webhook registration failed:', e.message);
+  }
+}
+
+setTimeout(registerTelegramWebhook, 3000);
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Crediplex server running on port ${PORT}`);
