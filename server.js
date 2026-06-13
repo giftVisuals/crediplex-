@@ -951,7 +951,6 @@ async function fetchPolymarketPositions(address) {
 }
 
 async function fetchPolymarketMarket(query) {
-async function fetchPolymarketMarket(query) {
   const isUrl = query.startsWith('http');
   let searchTerm = query;
   if (isUrl) {
