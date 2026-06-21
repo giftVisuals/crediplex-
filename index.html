@@ -6291,8 +6291,7 @@ window.submitCryptoDetailBet = async function(marketId, yesPool, noPool){
       const betRef = doc(collection(db,'bets'));
       tx.set(betRef,{uid:currentUser.uid,username:currentUserData.username,marketId,side,amount:amt,potentialPayout,status:'pending',isCrypto:true,createdAt:serverTimestamp()});
       const txRef = doc(collection(db,'transactions'));
-      tx.set(txRef,{uid:currentUser.uid,type:'crypto_bet',amount:-amt,note:`${side} on ${m?.symbol||marketId} crypto market`,createdAt:serverTimestamp()});
-    });
+      tx.set(txRef,{uid:currentUser.uid,type:'crypto_bet',amount:-amt,note:`${side} on ${window._cmdSymbol||marketId} crypto market`,createdAt:serverTimestamp()});
     notify(`${side==='YES'?'↑ UP':'↓ DOWN'} bet placed! 🎯`,'success');
     if(btn){ btn.textContent='✓ Bet Placed!'; btn.disabled=false; btn.style.background='linear-gradient(135deg,#10b981,#059669)'; }
     handleCopyTradeCrypto(marketId, side, amt, yesPool, noPool);
