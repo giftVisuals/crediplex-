@@ -6172,6 +6172,7 @@ window.openCryptoMarketDetail = async function(marketId, prefillSide){
     window._cmdMarketId = marketId;
     window._cmdYesPool = m.yesPool||0;
     window._cmdNoPool = m.noPool||0;
+    window._cmdSymbol = m.symbol||'';
 
     // Load chart
     if(pair) loadCryptoDetailChart('1H', pair.id, m.targetPrice||0);
