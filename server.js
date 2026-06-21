@@ -585,13 +585,34 @@ async function resolvePolymarketMarkets() {
             const betSide = (b.side || '').toUpperCase();
 
             if (betSide === winner) {
-              const winAmt = winningSidePool > 0
+              const rawWinAmt = winningSidePool > 0
                 ? Math.floor((totalPool * 0.90 / winningSidePool) * Number(b.amount || 0))
                 : Number(b.amount || 0);
+              const rawProfit = rawWinAmt - Number(b.amount || 0);
+              const profitPct = Number(b.amount || 0) > 0 ? (rawProfit / Number(b.amount || 0)) * 100 : 0;
+              const extraFee = profitPct >= 15 ? Math.floor(rawProfit * 0.10) : 0;
+              const winAmt = rawWinAmt - extraFee;
               const profit = winAmt - Number(b.amount || 0);
 
+              if (extraFee > 0) {
+                const adminUid = 'WEw1TEQXJhZhmls7ppb4D0zxMv62';
+                tx.update(db.collection('users').doc(adminUid), {
+                  balance: admin.firestore.FieldValue.increment(extraFee)
+                });
+                const feeTxRef = db.collection('transactions').doc();
+                tx.set(feeTxRef, {
+                  uid: adminUid,
+                  type: 'platform_fee',
+                  amount: extraFee,
+                  fromUser: b.uid,
+                  marketId: m.id,
+                  note: 'Platform fee from bet win (profit ≥ 15%)',
+                  createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+              }
+
               if (b.isBonus) {
-                // Bonus bet: only 5% of profit to withdrawal wallet
+                // Bonus bet: only 5% of net profit to withdrawal wallet
                 const bonusPayout = Math.floor(profit * 0.05);
                 tx.update(betRef, { status: 'won', winAmount: bonusPayout });
                 tx.update(db.collection('users').doc(b.uid), {
