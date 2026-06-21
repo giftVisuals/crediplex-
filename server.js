@@ -705,8 +705,10 @@ async function autoSyncPolymarketMarkets() {
       // Group multi-candidate events (>1 sub-market) into ONE multi-outcome market.
       // Keep single-market events as normal binary markets.
       const allMarkets = [];
+      let _multiOutcomeCount = 0;
       for (const event of data) {
         if (event.markets && Array.isArray(event.markets) && event.markets.length > 1) {
+          _multiOutcomeCount++;
           const activeSubMarkets = event.markets.filter(m => m.active !== false && m.closed !== true);
           if (!activeSubMarkets.length) continue;
           const outcomes = activeSubMarkets.map(m => m.groupItemTitle || m.question || 'Option');
