@@ -859,7 +859,7 @@ _existingPmIdsCache[pmId] = true; // remember it so we don't re-import it before
       await new Promise(r => setTimeout(r, 200));
     }
 
-    console.log(`✅ Auto-sync done: ${imported} new, ${updated} updated`);
+    console.log(`✅ Auto-sync done: ${imported} new, ${updated} updated, ${typeof _multiOutcomeCount !== 'undefined' ? _multiOutcomeCount : 0} multi-outcome events detected`);
   } catch (err) {
     console.error('autoSyncPolymarketMarkets error:', err.message);
   }
