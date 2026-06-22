@@ -2645,7 +2645,7 @@ async function checkAndShowBroadcastPopup(){
   if(_broadcastCheckedThisSession) return;
   _broadcastCheckedThisSession = true;
   try {
-    const q = query(collection(db,'notifications'), where('read','==',false), limit(20));
+    const q = query(collection(db,'notifications'), where('read','==',false), limit(5));
     const snap = await getDocs(q);
     if(snap.empty) return;
 
