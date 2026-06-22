@@ -2017,7 +2017,8 @@ async function renderPortfolio(main){
 
   // ─── FETCH AND POPULATE PORTFOLIO DATA ───
   const q = query(collection(db,'bets'), where('uid','==',currentUser.uid), orderBy('createdAt','desc'), limit(50));
-  const unsub = onSnapshot(q, snap=>{
+  const unsub = ()=>{};
+  getDocs(q).then(snap=>{
     const bets = snap.docs.map(d=>({id:d.id,...d.data()}));
     const active = bets.filter(b=>b.status==='pending');
     const won = bets.filter(b=>b.status==='won');
