@@ -6295,6 +6295,7 @@ window.submitCryptoDetailBet = async function(marketId, yesPool, noPool){
     notify(`${side==='YES'?'↑ UP':'↓ DOWN'} bet placed! 🎯`,'success');
     if(btn){ btn.textContent='✓ Bet Placed!'; btn.disabled=false; btn.style.background='linear-gradient(135deg,#10b981,#059669)'; }
     handleCopyTradeCrypto(marketId, side, amt, yesPool, noPool);
+  });
   } catch(e){
     notify(e.message,'error');
     if(btn){ btn.textContent=`Bet ${side}`; btn.disabled=false; }
