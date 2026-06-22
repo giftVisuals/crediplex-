@@ -7288,7 +7288,7 @@ async function startPolymarketSync(){
   // check resolutions every 2 minutes
   setTimeout(()=>{
     checkPolymarketMarketResolutions();
-    setInterval(checkPolymarketMarketResolutions, 90 * 1000);
+    setInterval(checkPolymarketMarketResolutions, 600 * 1000);
   }, 15000);
 }
 // ─── ADD TO BET QUEUE ─────────────────────────────────────────
