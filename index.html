@@ -192,7 +192,7 @@ onAuthStateChanged(auth, async user => {
     });
 
     // ─── GLOBAL CERTIFICATE LISTENER ─────────────────────────
-    const betsRef = query(collection(db,'bets'), where('uid','==',user.uid), limit(100));
+    const betsRef = query(collection(db,'bets'), where('uid','==',user.uid), limit(30));
     let certListenerFirstRun = true;
     onSnapshot(betsRef, snap=>{
       if(certListenerFirstRun){
