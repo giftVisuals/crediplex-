@@ -6494,12 +6494,12 @@ async function checkAndCreateCryptoMarkets(){
   } catch(e){ console.log('create crypto market error',e); }
 }
 
+const _resolvedMarkets = new Set();
 async function checkCryptoResolve(market){
   const deadline = market.deadline?.toDate ? market.deadline.toDate() : new Date(market.deadline);
-  if(new Date() < deadline) return; // not yet
-  // already being resolved
-  if(market._resolving) return;
-
+  if(new Date() < deadline) return;
+  if(_resolvedMarkets.has(market.id)) return;
+  _resolvedMarkets.add(market.id);
   try {
     const prices = await fetchCryptoPricesWithCache();
     const pair = CRYPTO_PAIRS.find(p=>p.symbol===market.symbol);
