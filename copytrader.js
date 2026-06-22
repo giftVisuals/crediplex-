@@ -155,7 +155,7 @@ async function pollAllCopyRelations(db, admin) {
               const copier = copierSnap.data();
 
               const tradeUsd = parseFloat(trade.size || trade.amount || trade.usdcSize || 0);
-              const liveRate = 1360; // update this periodically or fetch from your /api/live-rate
+              const liveRate = global.liveUsdToNgn || 1360;
               let betAmount;
               if (rel.copyMode === 'fixed' && rel.fixedBetAmount > 0) {
                 betAmount = rel.fixedBetAmount;
