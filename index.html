@@ -5902,7 +5902,7 @@ async function renderCrypto(main){
 
   // create new market if needed
   checkAndCreateCryptoMarkets();
-  const createInterval = setInterval(checkAndCreateCryptoMarkets, 60000);
+  const createInterval = setInterval(checkAndCreateCryptoMarkets, 600000);
   activeListeners.push(()=>clearInterval(createInterval));
 }
 
