@@ -2581,7 +2581,7 @@ window.sharePortfolioLink = function(){
   const username = currentUserData?.username || currentUser?.uid;
   const uid = currentUser?.uid || '';
   const shortId = uid.substring(0,6);
-  const url = `${window.location.origin}/index.html?portfolio=${username}-${shortId}`;
+  const url = `${window.location.origin}/portfolio=${username}-${shortId}`;
   if(navigator.share){
     navigator.share({ title:`${username}'s Crediplex Portfolio`, text:`Check out my prediction market portfolio on Crediplex! 🎯`, url }).catch(()=>{});
   } else {
