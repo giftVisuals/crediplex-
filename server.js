@@ -734,8 +734,7 @@ setInterval(resolvePolymarketMarkets, 15 * 60 * 1000);
 // Also run immediately on server start
 setTimeout(resolvePolymarketMarkets, 90000);
 // ─── COPY TRADE POLLER + TELEGRAM ────────────────────────────
-const { pollAllCopyRelations } = require('./copytrader');
-
+const pollAllCopyRelations = async () => {};
 app.post('/api/telegram-test', async (req, res) => {
   const { chatId, username } = req.body;
   if (!chatId) return res.json({ success: false });
