@@ -2127,8 +2127,7 @@ async function checkPriceAlerts(){
         const currentOdds = mkt.polymarketYesOdds || (mkt.yesPool&&mkt.noPool ? Math.round(mkt.yesPool/(mkt.yesPool+mkt.noPool)*100) : 50);
         if(currentOdds >= Number(alert.threshold)){
           if(u.telegramChatId){
-            const { sendTelegram } = require('./copytrader');
-            await sendTelegram(u.telegramChatId,
+            await sendTelegramMessage(u.telegramChatId,
               `🔔 <b>Price Alert!</b>\n\n` +
               `<b>${(mkt.question||'').substring(0,80)}</b>\n\n` +
               `YES odds just hit <b>${currentOdds}%</b> (your alert: ${alert.threshold}%)\n\n` +
