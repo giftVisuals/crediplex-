@@ -2324,7 +2324,6 @@ app.post('/api/copy-trade', async (req, res) => {
   if(!traderId || !marketId || !side || !amount) return res.json({ success: false, error: 'Missing params' });
   try {
     const snap = await db.collection('copyRelations').where('traderId','==',traderId).get();
-    const snap = await db.collection('copyRelations').where('traderId','==',traderId).get();
     for(const d of snap.docs){
       const rel = d.data();
       const multiplier = rel.multiplier || 1;
