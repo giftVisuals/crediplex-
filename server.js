@@ -1987,7 +1987,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
         `⚠️ <b>Important:</b> Use your Crediplex username as payment reference so we can credit your wallet.\n\n` +
         `Minimum: <b>₦500</b> • Credited within 15 minutes after confirmation.`,
         { reply_markup: { inline_keyboard: [
-          [{ text: '✅ I've Sent Payment', url: 'https://crediplex.name.ng/#deposit-confirm' }],
+          [{ text: '✅ I Have Sent Payment', url: 'https://crediplex.name.ng/#deposit-confirm' }],
           [{ text: '💵 Pay with Crypto Instead', callback_data: 'deposit_crypto' }]
         ]}}
       );
