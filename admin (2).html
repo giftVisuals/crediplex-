@@ -1,0 +1,2382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Crediplex Admin Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --blue: #2563eb;
+    --blue-light: #3b82f6;
+    --blue-dark: #1d4ed8;
+    --blue-pale: #dbeafe;
+    --white: #ffffff;
+    --bg: #f0f4ff;
+    --glass: rgba(255,255,255,0.72);
+    --glass-border: rgba(255,255,255,0.55);
+    --sidebar-bg: rgba(37,99,235,0.92);
+    --sidebar-glass: rgba(255,255,255,0.10);
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --text-light: #94a3b8;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warn: #f59e0b;
+    --radius: 16px;
+    --shadow: 0 8px 32px rgba(37,99,235,0.10);
+    --shadow-lg: 0 20px 60px rgba(37,99,235,0.15);
+    --transition: 0.22s cubic-bezier(.4,0,.2,1);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+
+  /* Background mesh */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 10% 10%, rgba(37,99,235,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 90% 80%, rgba(59,130,246,0.10) 0%, transparent 55%),
+      radial-gradient(ellipse 40% 40% at 50% 50%, rgba(219,234,254,0.4) 0%, transparent 70%),
+      linear-gradient(135deg, #eef2ff 0%, #f0f4ff 50%, #e8f0fe 100%);
+    pointer-events: none;
+  }
+
+  /* ─── AUTH SCREEN ─── */
+  #auth-screen {
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%);
+  }
+  #auth-screen::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 70% 60% at 30% 40%, rgba(255,255,255,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 50% at 80% 70%, rgba(255,255,255,0.05) 0%, transparent 55%);
+    pointer-events: none;
+  }
+  .auth-card {
+    background: rgba(255,255,255,0.10);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.20);
+    border-radius: 24px;
+    padding: 48px 44px;
+    width: 420px;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.25);
+    text-align: center;
+    animation: slideUp 0.5s cubic-bezier(.4,0,.2,1);
+  }
+  @keyframes slideUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+  .auth-logo {
+    font-family: 'Sora', sans-serif;
+    font-size: 28px; font-weight: 700;
+    color: #fff; margin-bottom: 4px; letter-spacing: -0.5px;
+  }
+  .auth-logo span { color: rgba(255,255,255,0.6); font-weight: 400; font-size: 14px; display: block; margin-top: 2px; }
+  .auth-title { color: rgba(255,255,255,0.85); font-size: 14px; margin-bottom: 32px; font-weight: 400; }
+  .auth-input {
+    width: 100%; padding: 14px 18px;
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.20);
+    border-radius: 12px; color: #fff; font-family: 'DM Sans', sans-serif; font-size: 15px;
+    outline: none; margin-bottom: 14px; transition: var(--transition);
+  }
+  .auth-input::placeholder { color: rgba(255,255,255,0.45); }
+  .auth-input:focus { border-color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.18); }
+  .auth-btn {
+    width: 100%; padding: 15px; border: none; border-radius: 12px;
+    background: #fff; color: var(--blue-dark); font-family: 'Sora', sans-serif;
+    font-weight: 600; font-size: 15px; cursor: pointer; transition: var(--transition);
+    margin-top: 6px;
+  }
+  .auth-btn:hover { background: #dbeafe; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+  .auth-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .auth-error { color: #fca5a5; font-size: 13px; margin-top: 12px; min-height: 20px; }
+
+  /* ─── ACCESS DENIED ─── */
+  #denied-screen {
+    position: fixed; inset: 0; z-index: 1000;
+    display: none; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%);
+  }
+  .denied-card {
+    background: rgba(255,255,255,0.10); backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 24px;
+    padding: 52px 48px; text-align: center; width: 400px;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.25);
+  }
+  .denied-icon { font-size: 56px; margin-bottom: 20px; }
+  .denied-title { font-family: 'Sora', sans-serif; font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 10px; }
+  .denied-msg { color: rgba(255,255,255,0.65); font-size: 14px; margin-bottom: 28px; line-height: 1.6; }
+  .denied-btn { padding: 13px 32px; border: 1px solid rgba(255,255,255,0.3); border-radius: 10px;
+    background: rgba(255,255,255,0.12); color: #fff; font-family: 'DM Sans', sans-serif;
+    font-size: 14px; cursor: pointer; transition: var(--transition); }
+  .denied-btn:hover { background: rgba(255,255,255,0.22); }
+
+  /* ─── APP SHELL ─── */
+  #app { display: none; height: 100vh; position: relative; z-index: 1; }
+  #app.visible { display: flex; }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    width: 260px; flex-shrink: 0;
+    background: var(--sidebar-bg);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border-right: 1px solid rgba(255,255,255,0.15);
+    display: flex; flex-direction: column;
+    padding: 0; overflow: hidden;
+    box-shadow: 4px 0 40px rgba(37,99,235,0.18);
+    transition: var(--transition);
+  }
+  .sidebar-header {
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+  }
+  .sidebar-logo { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+  .sidebar-logo span { color: rgba(255,255,255,0.55); font-size: 11px; font-weight: 400; display: block; margin-top: 2px; font-family: 'DM Sans', sans-serif; letter-spacing: 0.5px; text-transform: uppercase; }
+  .sidebar-admin {
+    padding: 16px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .admin-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,0.20); display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .admin-info { flex: 1; min-width: 0; }
+  .admin-name { font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .admin-role { font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.5px; }
+  .sidebar-nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+  .nav-section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.4); padding: 8px 12px 4px; font-family: 'Sora', sans-serif; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px; border-radius: 10px; margin-bottom: 2px;
+    color: rgba(255,255,255,0.72); font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: var(--transition); user-select: none;
+    position: relative;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .nav-item.active { background: rgba(255,255,255,0.18); color: #fff; }
+  .nav-item.active::before {
+    content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 60%; border-radius: 0 3px 3px 0;
+    background: #fff;
+  }
+  .nav-icon { font-size: 18px; width: 22px; text-align: center; flex-shrink: 0; }
+  .nav-badge {
+    margin-left: auto; background: var(--danger); color: #fff;
+    font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; min-width: 20px; text-align: center;
+  }
+  .sidebar-footer { padding: 16px 12px; border-top: 1px solid rgba(255,255,255,0.12); }
+  .signout-btn {
+    width: 100%; padding: 11px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.20);
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.75);
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: var(--transition); display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .signout-btn:hover { background: rgba(239,68,68,0.25); border-color: rgba(239,68,68,0.4); color: #fff; }
+
+  /* ─── MAIN CONTENT ─── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar {
+    padding: 18px 32px; display: flex; align-items: center; gap: 16px;
+    background: rgba(255,255,255,0.95);
+    border-bottom: 1px solid var(--glass-border);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 9999;
+  }
+  .topbar-title { font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700; color: var(--text); flex: 1; }
+  .topbar-time { font-size: 12px; color: var(--text-muted); }
+  .content-area { flex: 1; overflow-y: auto; padding: 28px 32px; position: relative; z-index: 1; }
+
+  /* ─── SECTIONS ─── */
+  .section { display: none; animation: fadeIn 0.3s ease; }
+  .section.active { display: block; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+  /* ─── STAT CARDS ─── */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin-bottom: 28px; }
+  .stat-card {
+    background: rgba(255,255,255,0.92);
+    border: 1px solid var(--glass-border); border-radius: var(--radius);
+    padding: 22px; box-shadow: var(--shadow);
+    transition: var(--transition); position: relative; overflow: hidden;
+  }
+  .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+  .stat-card::after {
+    content: ''; position: absolute; top: 0; right: 0;
+    width: 80px; height: 80px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(37,99,235,0.08), transparent 70%);
+    transform: translate(20px, -20px);
+  }
+  .stat-icon { font-size: 24px; margin-bottom: 12px; }
+  .stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; margin-bottom: 6px; }
+  .stat-value { font-family: 'Sora', sans-serif; font-size: 26px; font-weight: 700; color: var(--blue); }
+  .stat-sub { font-size: 11px; color: var(--text-light); margin-top: 4px; }
+
+  /* ─── GLASS CARD ─── */
+  .glass-card {
+    background: rgba(255,255,255,0.92);
+    border: 1px solid var(--glass-border); border-radius: var(--radius);
+    box-shadow: var(--shadow); margin-bottom: 20px;
+  }
+  .card-header {
+    padding: 20px 24px 16px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid rgba(37,99,235,0.08); flex-wrap: wrap; gap: 12px;
+  }
+  .card-title { font-family: 'Sora', sans-serif; font-size: 16px; font-weight: 600; color: var(--text); }
+  .card-body { padding: 20px 24px; }
+
+  /* ─── BUTTONS ─── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 18px; border-radius: 9px; font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 600; cursor: pointer; border: none;
+    transition: var(--transition); white-space: nowrap;
+  }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: var(--blue-dark); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,99,235,0.35); }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-success:hover { background: #059669; transform: translateY(-1px); }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { background: #dc2626; transform: translateY(-1px); }
+  .btn-warn { background: var(--warn); color: #fff; }
+  .btn-warn:hover { background: #d97706; }
+  .btn-ghost { background: rgba(37,99,235,0.08); color: var(--blue); border: 1px solid rgba(37,99,235,0.15); }
+  .btn-ghost:hover { background: rgba(37,99,235,0.15); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 7px; }
+
+  /* ─── TABLE ─── */
+  .table-wrapper { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { border-bottom: 2px solid rgba(37,99,235,0.08); }
+  th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+  td { padding: 12px 14px; font-size: 13px; color: var(--text); border-bottom: 1px solid rgba(37,99,235,0.05); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(37,99,235,0.02); }
+  .td-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* ─── BADGES ─── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .badge-green { background: rgba(16,185,129,0.12); color: #059669; }
+  .badge-red { background: rgba(239,68,68,0.12); color: #dc2626; }
+  .badge-blue { background: rgba(37,99,235,0.12); color: var(--blue); }
+  .badge-yellow { background: rgba(245,158,11,0.12); color: #d97706; }
+  .badge-gray { background: rgba(100,116,139,0.12); color: var(--text-muted); }
+
+  /* ─── SEARCH ─── */
+  .search-wrap { position: relative; }
+  .search-input {
+    padding: 10px 16px 10px 40px; border-radius: 10px;
+    border: 1px solid rgba(37,99,235,0.15); background: rgba(255,255,255,0.8);
+    font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text);
+    outline: none; width: 280px; transition: var(--transition);
+  }
+  .search-input:focus { border-color: var(--blue); background: #fff; box-shadow: 0 0 0 3px rgba(37,99,235,0.08); }
+  .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-light); font-size: 14px; }
+
+  /* ─── FILTER TABS ─── */
+  .filter-tabs { display: flex; gap: 4px; padding: 4px; background: rgba(37,99,235,0.06); border-radius: 10px; width: fit-content; }
+  .filter-tab {
+    padding: 7px 16px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer;
+    color: var(--text-muted); border: none; background: none; transition: var(--transition); font-family: 'DM Sans', sans-serif;
+  }
+  .filter-tab.active { background: #fff; color: var(--blue); box-shadow: 0 2px 8px rgba(37,99,235,0.12); }
+  .filter-tab:hover:not(.active) { color: var(--blue); }
+
+  /* ─── FORM ELEMENTS ─── */
+  .form-group { margin-bottom: 16px; }
+  .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .form-control {
+    width: 100%; padding: 11px 14px; border-radius: 10px;
+    border: 1px solid rgba(37,99,235,0.15); background: rgba(255,255,255,0.8);
+    font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text);
+    outline: none; transition: var(--transition);
+  }
+  .form-control:focus { border-color: var(--blue); background: #fff; box-shadow: 0 0 0 3px rgba(37,99,235,0.08); }
+  textarea.form-control { min-height: 90px; resize: vertical; }
+  select.form-control { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px; }
+
+  /* ─── MODAL ─── */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 500;
+    background: rgba(15,23,42,0.45); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--glass); backdrop-filter: blur(24px);
+    border: 1px solid var(--glass-border); border-radius: 20px;
+    width: 100%; max-width: 520px; box-shadow: var(--shadow-lg);
+    transform: translateY(20px) scale(0.97); transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal-overlay.open .modal { transform: none; }
+  .modal-header {
+    padding: 22px 24px 18px; border-bottom: 1px solid rgba(37,99,235,0.08);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title { font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 700; color: var(--text); }
+  .modal-close { width: 32px; height: 32px; border-radius: 8px; background: rgba(100,116,139,0.10); border: none; cursor: pointer; font-size: 18px; color: var(--text-muted); display: flex; align-items: center; justify-content: center; transition: var(--transition); }
+  .modal-close:hover { background: rgba(239,68,68,0.10); color: var(--danger); }
+  .modal-body { padding: 22px 24px; }
+  .modal-footer { padding: 16px 24px 22px; display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid rgba(37,99,235,0.06); }
+
+  /* ─── TOAST ─── */
+  #toast-container { position: fixed; top: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    padding: 13px 18px; border-radius: 12px; font-size: 13px; font-weight: 500;
+    background: #1e293b; color: #fff; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    display: flex; align-items: center; gap: 10px;
+    animation: toastIn 0.3s cubic-bezier(.4,0,.2,1);
+    max-width: 340px;
+  }
+  @keyframes toastIn { from { opacity:0; transform:translateX(30px); } to { opacity:1; transform:none; } }
+  .toast.success { background: #065f46; }
+  .toast.error { background: #7f1d1d; }
+  .toast.warn { background: #78350f; }
+
+  /* ─── SUMMARY BAR ─── */
+  .summary-bar { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+  .summary-item { background: var(--glass); backdrop-filter: blur(8px); border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px 18px; }
+  .summary-item .s-label { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+  .summary-item .s-val { font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700; color: var(--blue); }
+
+  /* ─── BROADCAST TABS ─── */
+  .bc-tabs { display: flex; border-bottom: 2px solid rgba(37,99,235,0.08); margin-bottom: 22px; }
+  .bc-tab { padding: 10px 20px; font-size: 13px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: var(--transition); }
+  .bc-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+  /* ─── NOTIFICATION HISTORY ─── */
+  .notif-item { padding: 14px 16px; border-radius: 10px; background: rgba(37,99,235,0.04); border: 1px solid rgba(37,99,235,0.08); margin-bottom: 10px; }
+  .notif-item .n-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .notif-item .n-title { font-weight: 600; font-size: 13px; }
+  .notif-item .n-meta { font-size: 11px; color: var(--text-light); }
+  .notif-item .n-msg { font-size: 13px; color: var(--text-muted); }
+  .notif-item .n-target { font-size: 11px; color: var(--blue); font-weight: 500; margin-bottom: 4px; }
+
+  /* ─── EMPTY STATE ─── */
+  .empty-state { text-align: center; padding: 52px 20px; color: var(--text-light); }
+  .empty-state .e-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state .e-msg { font-size: 14px; }
+
+  /* ─── LOADING ─── */
+  .spinner { width: 20px; height: 20px; border: 2px solid rgba(37,99,235,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── USER SEARCH RESULT ─── */
+  .user-result {
+    padding: 12px 14px; border-radius: 10px;
+    background: rgba(37,99,235,0.06); border: 1px solid rgba(37,99,235,0.12);
+    display: flex; align-items: center; gap: 12px; margin-top: 10px;
+  }
+  .user-result .ur-avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink: 0; }
+  .user-result .ur-name { font-weight: 600; font-size: 13px; }
+  .user-result .ur-email { font-size: 11px; color: var(--text-muted); }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 768px) {
+    .sidebar { width: 220px; }
+    .content-area { padding: 18px 16px; }
+    .topbar { padding: 14px 18px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .search-input { width: 200px; }
+  }
+  @media (max-width: 600px) {
+    .sidebar { position: fixed; left: -260px; top: 0; bottom: 0; z-index: 200; width: 240px; transition: left 0.3s ease; }
+    .sidebar.open { left: 0; }
+    .stats-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(37,99,235,0.2); border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(37,99,235,0.4); }
+.drop-item { padding:10px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;color:rgba(255,255,255,0.85);transition:var(--transition); }
+.drop-item:hover { background:rgba(255,255,255,0.10);color:#fff; }
+  
+  .text-truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; display: inline-block; }
+  .divider { border: none; border-top: 1px solid rgba(37,99,235,0.07); margin: 16px 0; }
+  .mt-16 { margin-top: 16px; }
+  .fw-6 { font-weight: 600; }
+  .text-muted { color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- ── AUTH SCREEN ── -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">Crediplex <span>Admin Panel</span></div>
+    <div class="auth-title">Sign in with your admin Google account</div>
+    <input id="auth-email" class="auth-input" type="email" placeholder="Email address" />
+    <input id="auth-pass" class="auth-input" type="password" placeholder="Password" />
+    <button id="auth-btn" class="auth-btn" onclick="doLogin()">Sign In</button>
+    <div class="auth-error" id="auth-error"></div>
+  </div>
+</div>
+
+<!-- ── ACCESS DENIED ── -->
+<div id="denied-screen">
+  <div class="denied-card">
+    <div class="denied-icon">🚫</div>
+    <div class="denied-title">Access Denied</div>
+    <div class="denied-msg">This admin panel is restricted.<br>Your account is not authorized to access this area.</div>
+    <button class="denied-btn" onclick="doDeniedSignout()">Sign out & go back</button>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">Crediplex <span>Admin Dashboard</span></div>
+    </div>
+    <div class="sidebar-admin">
+      <div class="admin-avatar">👤</div>
+      <div class="admin-info">
+        <div class="admin-name" id="admin-email-display">Admin</div>
+        <div class="admin-role">Super Admin</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <div class="nav-item active" data-section="dashboard"><span class="nav-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span> Dashboard</div>
+      <div class="nav-section-label">Management</div>
+      <div class="nav-item" data-section="markets"><span class="nav-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span> Markets</div>
+      <div class="nav-item" data-section="users"><span class="nav-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Users</div>
+      <div class="nav-item" data-section="bets"><span class="nav-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span> Bets</div>
+      <div class="nav-section-label">Finance</div>
+      <div class="nav-item" data-section="deposits"><span class="nav-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span> Deposits <span class="nav-badge" id="badge-deposits" style="display:none">0</span></div>
+      <div class="nav-item" data-section="withdrawals"><span class="nav-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></span> Withdrawals <span class="nav-badge" id="badge-withdrawals" style="display:none">0</span></div>
+      <div class="nav-section-label">Prediction Sections</div>
+      <div class="nav-item" data-section="telegram-markets"><span class="nav-icon">📱</span> Telegram Markets</div>
+      <div class="nav-section-label">Comms</div>
+      <div class="nav-item" data-section="verifications"><span class="nav-icon">✅</span> Verifications <span class="nav-badge" id="badge-verifications" style="display:none">0</span></div>
+      <div class="nav-item" data-section="broadcast"><span class="nav-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.99 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.9 1.17h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span> Broadcast</div>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="signout-btn" onclick="doSignOut()"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Sign Out</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+      <div class="topbar-time" id="topbar-time"></div>
+      <div style="position:relative">
+          <div id="dropdown-overlay" onclick="toggleDropdown()" style="display:none;position:fixed;inset:0;z-index:8888;"></div>
+        <button id="menu-btn" onclick="toggleDropdown()" style="display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:9px;border:1px solid rgba(37,99,235,0.15);background:white;cursor:pointer;font-weight:600;font-size:13px;font-family:'DM Sans',sans-serif;color:#1e293b;">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          Menu
+        </button>
+        <div id="dropdown-menu" style="display:none;position:fixed;right:16px;top:72px;background:#1e293b;border:1px solid rgba(255,255,255,0.08);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,0.4);min-width:190px;z-index:9999;padding:6px;overflow:hidden;">
+          <div class="drop-item" onclick="goTo('dashboard')">Dashboard</div>
+          <div class="drop-item" onclick="goTo('markets')">Markets</div>
+          <div class="drop-item" onclick="goTo('users')">Users</div>
+          <div class="drop-item" onclick="goTo('bets')">Bets</div>
+          <div class="drop-item" onclick="goTo('deposits')">Deposits</div>
+          <div class="drop-item" onclick="goTo('withdrawals')">Withdrawals</div>
+          <div class="drop-item" onclick="goTo('telegram-markets')">Telegram Markets</div>
+          <div class="drop-item" onclick="goTo('verifications')">Verifications</div>
+          <div class="drop-item" onclick="goTo('broadcast')">Broadcast</div>
+          <div style="border-top:1px solid rgba(255,255,255,0.08);margin:6px 0;"></div>
+          <div class="drop-item" onclick="doSignOut()" style="color:#ef4444;">Sign Out</div>
+        </div>
+      </div>
+    </div>
+    <div class="content-area">
+
+      <!-- ── DASHBOARD ── -->
+      <section class="section active" id="sec-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Total Users</div><div class="stat-value" id="stat-users">—</div></div>
+          <div class="stat-card"><div class="stat-icon">🎯</div><div class="stat-label">Total Bets</div><div class="stat-value" id="stat-bets">—</div></div>
+          <div class="stat-card"><div class="stat-icon">💳</div><div class="stat-label">Total Deposited</div><div class="stat-value" id="stat-deposited">—</div></div>
+          <div class="stat-card"><div class="stat-icon">💸</div><div class="stat-label">Total Withdrawn</div><div class="stat-value" id="stat-withdrawn">—</div></div>
+          <div class="stat-card"><div class="stat-icon">🏊</div><div class="stat-label">Active Pool</div><div class="stat-value" id="stat-pool">—</div></div>
+        </div>
+        <div class="glass-card">
+          <div class="card-header"><div class="card-title">Live System Overview</div></div>
+          <div class="card-body" id="dashboard-markets-list"><div class="empty-state"><div class="e-icon">📊</div><div class="e-msg">Loading market data...</div></div></div>
+        </div>
+      </section>
+
+      <!-- ── MARKETS ── -->
+      <section class="section" id="sec-markets">
+        <div class="glass-card">
+          <div class="card-header">
+            <div class="card-title">All Markets</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <div class="search-wrap">
+                <span class="search-icon">🔍</span>
+                <input class="search-input" type="text" placeholder="Search markets..." id="markets-search" oninput="filterMarketsTable()" />
+              </div>
+              <div style="display:flex;gap:4px;background:rgba(37,99,235,0.06);border-radius:8px;padding:3px">
+                <button onclick="setMarketFilter('all')" id="mf-all" style="padding:5px 12px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;background:#2563eb;color:white;font-family:'DM Sans',sans-serif">All</button>
+                <button onclick="setMarketFilter('crediplex')" id="mf-crediplex" style="padding:5px 12px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;background:transparent;color:#64748b;font-family:'DM Sans',sans-serif">Crediplex</button>
+                <button onclick="setMarketFilter('polymarket')" id="mf-polymarket" style="padding:5px 12px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;background:transparent;color:#64748b;font-family:'DM Sans',sans-serif">Polymarket</button>
+              </div>
+              <button class="btn btn-ghost" id="pm-sync-btn" onclick="adminSyncPolymarket()">🔄 Sync Polymarket</button>
+              <button class="btn btn-ghost" onclick="refreshMarketCache()">♻️ Refresh Cache</button>
+              <button class="btn btn-primary" onclick="openModal('modal-create-market')">＋ Create Market</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table id="markets-table">
+                <thead><tr><th>Question</th><th>Category</th><th>Status</th><th>Outcomes</th><th>Total Pool</th><th>Deadline</th><th>Actions</th></tr></thead>
+                <tbody id="markets-tbody"><tr><td colspan="8"><div class="empty-state"><div class="e-icon">⏳</div><div class="e-msg">Loading...</div></div></td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── USERS ── -->
+      <section class="section" id="sec-users">
+        <div class="glass-card">
+          <div class="card-header">
+            <div class="card-title">All Users</div>
+            <div class="search-wrap">
+              <span class="search-icon">🔍</span>
+              <input class="search-input" type="text" placeholder="Search username or email..." id="users-search" oninput="filterUsers()" />
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>Username</th><th>Email</th><th>Balance</th><th>Bets</th><th>Wins</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+                <tbody id="users-tbody"><tr><td colspan="8"><div class="empty-state"><div class="e-icon">⏳</div><div class="e-msg">Loading...</div></div></td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── BETS ── -->
+      <section class="section" id="sec-bets">
+        <div class="glass-card">
+          <div class="card-header">
+            <div class="card-title">All Bets</div>
+            <div class="filter-tabs" id="bets-filter">
+              <button class="filter-tab active" data-val="all">All</button>
+              <button class="filter-tab" data-val="pending">Pending</button>
+              <button class="filter-tab" data-val="won">Won</button>
+              <button class="filter-tab" data-val="lost">Lost</button>
+              <button class="filter-tab" data-val="refunded">Refunded</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="summary-bar" id="bets-summary"></div>
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>User</th><th>Market</th><th>Side</th><th>Amount</th><th>Payout</th><th>Status</th><th>Date</th></tr></thead>
+                <tbody id="bets-tbody"><tr><td colspan="7"><div class="empty-state"><div class="e-icon">⏳</div><div class="e-msg">Loading...</div></div></td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── DEPOSITS ── -->
+      <section class="section" id="sec-deposits">
+        <div class="glass-card">
+          <div class="card-header">
+            <div class="card-title">Deposit Requests</div>
+            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+              <div class="filter-tabs" id="deposits-filter">
+                <button class="filter-tab active" data-val="pending">Pending</button>
+                <button class="filter-tab" data-val="approved">Approved</button>
+                <button class="filter-tab" data-val="rejected">Rejected</button>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="window._adminForceLoadDeposits && window._adminForceLoadDeposits()">🔄 Refresh</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>Username</th><th>Email</th><th>Sender Name</th><th>Amount</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="deposits-tbody"><tr><td colspan="7"><div class="empty-state"><div class="e-icon">⏳</div><div class="e-msg">Loading...</div></div></td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── WITHDRAWALS ── -->
+      <section class="section" id="sec-withdrawals">
+        <div class="glass-card">
+          <div class="card-header">
+            <div class="card-title">Withdrawal Requests</div>
+            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+              <div class="filter-tabs" id="withdrawals-filter">
+                <button class="filter-tab active" data-val="pending">Pending</button>
+                <button class="filter-tab" data-val="approved">Approved</button>
+                <button class="filter-tab" data-val="rejected">Rejected</button>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="window._adminForceLoadWithdrawals && window._adminForceLoadWithdrawals()">🔄 Refresh</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>Username</th><th>Amount</th><th>Bank</th><th>Account No.</th><th>Account Name</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="withdrawals-tbody"><tr><td colspan="8"><div class="empty-state"><div class="e-icon">⏳</div><div class="e-msg">Loading...</div></div></td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── TELEGRAM MARKETS ── -->
+      <section class="section" id="sec-telegram-markets">
+        <div class="glass-card">
+          <div class="card-header">
+            <div class="card-title">📱 Telegram Prediction Markets</div>
+            <button class="btn btn-primary" onclick="openModal('modal-create-tg-market')">＋ Create Telegram Market</button>
+          </div>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>Question</th><th>Channel</th><th>Target Subs</th><th>Current Subs</th><th>Pool</th><th>Deadline</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="tg-markets-tbody"><tr><td colspan="8"><div class="empty-state"><div class="e-icon">⏳</div><div class="e-msg">Loading...</div></div></td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── VERIFICATIONS ── -->
+      <section class="section" id="sec-verifications">
+        <div class="glass-card">
+          <div class="card-header">
+            <div class="card-title">✅ Verification Requests</div>
+            <button class="btn btn-ghost btn-sm" onclick="loadVerificationRequests()">🔄 Refresh</button>
+          </div>
+          <div class="card-body" id="verifications-list">
+            <div class="empty-state"><div class="e-icon">⏳</div><div class="e-msg">Loading...</div></div>
+          </div>
+        </div>
+        <div class="glass-card">
+          <div class="card-header"><div class="card-title">Recently Reviewed</div></div>
+          <div class="card-body" id="verifications-history">
+            <div class="empty-state"><div class="e-icon">📋</div><div class="e-msg">Loading history...</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── BROADCAST ── -->
+      <section class="section" id="sec-broadcast">
+        <div class="glass-card">
+          <div class="card-header"><div class="card-title">Send Notifications</div></div>
+          <div class="card-body">
+            <div class="bc-tabs">
+              <div class="bc-tab active" data-bc="all">📢 Broadcast to All</div>
+              <div class="bc-tab" data-bc="specific">🎯 Send to Specific User</div>
+            </div>
+            <div id="bc-all">
+              <div class="form-group"><label class="form-label">Notification Title</label><input class="form-control" id="bc-all-title" placeholder="Enter title..." /></div>
+              <div class="form-group"><label class="form-label">Message</label><textarea class="form-control" id="bc-all-msg" placeholder="Enter message..."></textarea></div>
+              <div class="form-group"><label class="form-label">Image (optional)</label><input type="file" class="form-control" id="bc-all-img" accept="image/*" onchange="previewBcImg('bc-all-img','bc-all-img-preview')" /><div id="bc-all-img-preview" style="display:none;margin-top:8px;align-items:center;gap:8px"><img id="bc-all-img-thumb" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid rgba(37,99,235,0.15)"><span style="font-size:12px;color:#10b981">Ready to upload</span></div></div>
+              <button class="btn btn-primary" onclick="broadcastAll()">Send to All Users</button>
+            </div>
+            <div id="bc-specific" style="display:none">
+              <div class="form-group">
+                <label class="form-label">Find User</label>
+                <div class="search-wrap" style="width:100%">
+                  <span class="search-icon">🔍</span>
+                  <input class="search-input" style="width:100%" type="text" id="bc-user-search" placeholder="Search by username or email..." oninput="searchBcUser()" />
+                </div>
+                <div id="bc-user-result"></div>
+              </div>
+              <div class="form-group"><label class="form-label">Notification Title</label><input class="form-control" id="bc-sp-title" placeholder="Enter title..." /></div>
+              <div class="form-group"><label class="form-label">Message</label><textarea class="form-control" id="bc-sp-msg" placeholder="Enter message..."></textarea></div>
+              <div class="form-group"><label class="form-label">Image (optional)</label><input type="file" class="form-control" id="bc-sp-img" accept="image/*" onchange="previewBcImg('bc-sp-img','bc-sp-img-preview')" /><div id="bc-sp-img-preview" style="display:none;margin-top:8px;align-items:center;gap:8px"><img id="bc-sp-img-thumb" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid rgba(37,99,235,0.15)"><span style="font-size:12px;color:#10b981">Ready to upload</span></div></div>
+              <button class="btn btn-primary" onclick="sendToSpecific()">Send to User</button>
+            </div>
+          </div>
+        </div>
+        <div class="glass-card">
+          <div class="card-header"><div class="card-title">Notification History</div></div>
+          <div class="card-body" id="notif-history"><div class="empty-state"><div class="e-icon">📭</div><div class="e-msg">No notifications sent yet.</div></div></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div id="toast-container"></div>
+
+<!-- ── MODALS ── -->
+
+<!-- Create Market -->
+<div class="modal-overlay" id="modal-create-market">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title">Create New Market</div>
+      <button class="modal-close" onclick="closeModal('modal-create-market')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Question</label><textarea class="form-control" id="mk-question" placeholder="e.g. Who will win the 2027 Nigeria election?"></textarea></div>
+      <div class="form-group"><label class="form-label">Category</label>
+        <select class="form-control" id="mk-category">
+          <option value="Sports">⚽ Sports</option>
+          <option value="Crypto">₿ Crypto</option>
+          <option value="Politics">🏛️ Politics</option>
+          <option value="Election">🗳️ Election</option>
+          <option value="Geopolitical">🌍 Geopolitical</option>
+          <option value="Tech">💻 Tech & AI</option>
+          <option value="Culture">🎭 Culture</option>
+          <option value="Economic">📊 Economic</option>
+          <option value="Business">💼 Business</option>
+          <option value="Entertainment">🎬 Entertainment</option>
+          <option value="Weather">🌤️ Weather</option>
+          <option value="Others">🌐 Others</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Market Type</label>
+        <div style="display:flex;gap:8px">
+          <button id="mk-type-binary" onclick="setMkType('binary')" style="flex:1;padding:10px;border-radius:8px;border:2px solid #2563eb;background:#2563eb;color:white;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">YES / NO</button>
+          <button id="mk-type-multi" onclick="setMkType('multi')" style="flex:1;padding:10px;border-radius:8px;border:2px solid #e2e8f0;background:white;color:#64748b;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">Multiple Outcomes</button>
+        </div>
+      </div>
+      <!-- MULTI OUTCOMES SECTION -->
+      <div id="mk-outcomes-section" style="display:none">
+        <div class="form-group"><label class="form-label">Outcomes (up to 70)</label>
+          <div id="mk-outcomes-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+            <div class="mk-outcome-row" style="display:flex;gap:8px;align-items:center">
+              <input class="form-control" style="flex:1" placeholder="Outcome 1 e.g. Tinubu" />
+              <button onclick="removeMkOutcome(this)" style="background:rgba(239,68,68,0.1);border:none;color:#dc2626;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;flex-shrink:0">✕</button>
+            </div>
+            <div class="mk-outcome-row" style="display:flex;gap:8px;align-items:center">
+              <input class="form-control" style="flex:1" placeholder="Outcome 2 e.g. Atiku" />
+              <button onclick="removeMkOutcome(this)" style="background:rgba(239,68,68,0.1);border:none;color:#dc2626;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;flex-shrink:0">✕</button>
+            </div>
+          </div>
+          <button onclick="addMkOutcome()" style="width:100%;padding:10px;border-radius:8px;border:1.5px dashed rgba(37,99,235,0.3);background:rgba(37,99,235,0.04);color:#2563eb;font-weight:600;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">+ Add New Field</button>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Deadline</label><input class="form-control" type="datetime-local" id="mk-deadline" /></div>
+      <div class="form-group"><label class="form-label">Market Image</label>
+        <input type="file" id="mk-img-file" accept="image/*" class="form-control" onchange="previewImg(this)" />
+        <div id="mk-img-preview" style="margin-top:8px;display:none;align-items:center;gap:8px">
+          <img id="mk-img-thumb" style="width:60px;height:60px;object-fit:contain;border-radius:10px;border:1px solid rgba(37,99,235,0.15)" />
+          <span id="mk-img-status" style="font-size:12px;color:#10b981">✅ Ready to upload</span>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Description</label><textarea class="form-control" id="mk-desc" placeholder="Describe the market conditions..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-create-market')">Cancel</button>
+      <button class="btn btn-primary" onclick="createMarket()">Create Market</button>
+    </div>
+  </div>
+</div>
+
+<!-- Resolve Market -->
+<div class="modal-overlay" id="modal-resolve-market">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Resolve Market</div>
+      <button class="modal-close" onclick="closeModal('modal-resolve-market')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="resolve-market-info" class="notif-item" style="margin-bottom:16px"></div>
+      <div class="form-group">
+        <label class="form-label">Winning Outcome</label>
+        <div id="resolve-outcomes-picker" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px"></div>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:8px">⚠️ This will calculate payouts for all bets on this market. This action cannot be undone.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-resolve-market')">Cancel</button>
+      <button class="btn btn-success" onclick="resolveMarket()">Resolve & Pay Out</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Balance -->
+<div class="modal-overlay" id="modal-add-balance">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add Balance to User</div>
+      <button class="modal-close" onclick="closeModal('modal-add-balance')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="add-bal-user-info" class="notif-item" style="margin-bottom:16px"></div>
+      <div class="form-group"><label class="form-label">Amount (₦)</label><input class="form-control" type="number" id="add-bal-amount" placeholder="Enter amount..." min="1" /></div>
+      <div class="form-group"><label class="form-label">Note (optional)</label><input class="form-control" id="add-bal-note" placeholder="e.g. Bonus credit..." /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-balance')">Cancel</button>
+      <button class="btn btn-success" onclick="addBalance()">Add Balance</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete User -->
+<div class="modal-overlay" id="modal-delete-user">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Delete User Account</div>
+      <button class="modal-close" onclick="closeModal('modal-delete-user')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="del-user-info" class="notif-item" style="margin-bottom:16px;border-color:rgba(239,68,68,0.2);background:rgba(239,68,68,0.04)"></div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">This will delete the user's Firestore data including their bets, transactions, deposit requests, withdrawals, and notifications.</p>
+      <p style="font-size:12px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);padding:10px 14px;border-radius:8px;color:#92400e;">⚠️ Note: The Firebase Auth account must be manually deleted from the Firebase Console.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-delete-user')">Cancel</button>
+      <button class="btn btn-danger" onclick="deleteUser()">🗑️ Delete All Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Telegram Market Modal -->
+<div class="modal-overlay" id="modal-create-tg-market">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title">📱 Create Telegram Prediction Market</div>
+      <button class="modal-close" onclick="closeModal('modal-create-tg-market')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Question</label><textarea class="form-control" id="tg-question" placeholder="e.g. Will @durov channel go Higher Than 12M subscribers by Dec 2026?"></textarea></div>
+      <div class="form-group"><label class="form-label">Telegram Channel Username (without @)</label><input class="form-control" id="tg-channel" placeholder="e.g. durov" /></div>
+      <div class="form-group"><label class="form-label">Telegram Channel Link (shown to bettors)</label><input class="form-control" id="tg-channel-link" placeholder="e.g. https://t.me/durov" /></div>
+
+      <!-- Market Sub-Type -->
+      <div class="form-group">
+        <label class="form-label">Market Type</label>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button type="button" id="tg-type-higher" onclick="setTgMarketType('higher_than')" style="padding:0.5rem 1rem;border-radius:20px;border:2px solid #2563eb;background:#2563eb;color:white;font-weight:700;font-size:0.82rem;cursor:pointer;font-family:'DM Sans',sans-serif">📈 Higher Than</button>
+          <button type="button" id="tg-type-lower" onclick="setTgMarketType('lower_than')" style="padding:0.5rem 1rem;border-radius:20px;border:2px solid rgba(37,99,235,0.3);background:white;color:#2563eb;font-weight:700;font-size:0.82rem;cursor:pointer;font-family:'DM Sans',sans-serif">📉 Lower Than</button>
+        </div>
+        <input type="hidden" id="tg-market-subtype" value="higher_than" />
+      </div>
+
+      <!-- Outcome Mode Toggle -->
+      <div class="form-group">
+        <label class="form-label">Outcome Mode</label>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button type="button" id="tg-mode-yesno" onclick="setTgOutcomeMode('yesno')" style="padding:0.5rem 1rem;border-radius:20px;border:2px solid #2563eb;background:#2563eb;color:white;font-weight:700;font-size:0.82rem;cursor:pointer;font-family:'DM Sans',sans-serif">Yes / No</button>
+          <button type="button" id="tg-mode-multi" onclick="setTgOutcomeMode('multi')" style="padding:0.5rem 1rem;border-radius:20px;border:2px solid rgba(37,99,235,0.3);background:white;color:#2563eb;font-weight:700;font-size:0.82rem;cursor:pointer;font-family:'DM Sans',sans-serif">Multiple Milestones</button>
+        </div>
+      </div>
+
+      <!-- Yes/No: single target -->
+      <div id="tg-yesno-section">
+        <div class="form-group"><label class="form-label">Target Subscriber Count</label><input class="form-control" type="number" id="tg-target-subs" placeholder="e.g. 12000000" /></div>
+      </div>
+
+      <!-- Multi-outcome: milestone builder -->
+      <div id="tg-multi-section" style="display:none">
+        <div class="form-group">
+          <label class="form-label">Subscriber Milestones (up to 200 — one per line or comma-separated)</label>
+          <textarea class="form-control" id="tg-multi-outcomes" rows="5" placeholder="e.g.&#10;10000&#10;15000&#10;20000&#10;50000&#10;100000"></textarea>
+          <div style="font-size:0.75rem;color:#64748b;margin-top:4px">Each milestone becomes one betting outcome. Bettors pick which count the channel will reach. Resolves to the highest milestone reached at deadline.</div>
+        </div>
+      </div>
+
+      <div class="form-group"><label class="form-label">Deadline</label><input class="form-control" type="datetime-local" id="tg-deadline" /></div>
+      <div class="form-group"><label class="form-label">Description</label><textarea class="form-control" id="tg-description" placeholder="Describe the prediction..."></textarea></div>
+      <div class="form-group"><label class="form-label">Market Image (optional)</label><input type="file" class="form-control" id="tg-img-file" accept="image/*" onchange="previewTgImg(this)" /><div id="tg-img-preview" style="margin-top:8px;display:none;align-items:center;gap:8px"><img id="tg-img-thumb" style="width:60px;height:60px;object-fit:contain;border-radius:10px;border:1px solid rgba(37,99,235,0.15)" /><span style="font-size:12px;color:#10b981">✅ Ready</span></div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-create-tg-market')">Cancel</button>
+      <button class="btn btn-primary" id="tg-create-btn" onclick="createTelegramMarket()">Create Market</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDKs -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import {
+  getFirestore, collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc,
+  query, where, orderBy, limit, onSnapshot, runTransaction, getCountFromServer,
+  serverTimestamp, increment, Timestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const ADMIN_EMAIL = 'giftsemilore4@gmail.com';
+
+const app = initializeApp({
+  apiKey: "AIzaSyBz6Qex4MB1IL-YPypzgsH5MPUCyrlPXkg",
+  authDomain: "crediplexpredict.firebaseapp.com",
+  projectId: "crediplexpredict",
+  storageBucket: "crediplexpredict.firebasestorage.app",
+  messagingSenderId: "934288152519",
+  appId: "1:934288152519:web:b8db4bf6f69870cb13ebe2"
+});
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// ── Helpers ──
+window._currentUser = null;
+window._resolveMarketId = null;
+window._resolveMarketData = null;
+window._addBalanceUid = null;
+window._deleteUid = null;
+window._bcTargetUser = null;
+window._allUsersCache = [];
+window._allBetsCache = [];
+window._allDepositsCache = [];
+window._allWithdrawalsCache = [];
+window._currentBetFilter = 'all';
+window._currentDepFilter = 'pending';
+window._currentWdFilter = 'pending';
+
+function fmt(n) { return '₦' + Number(n||0).toLocaleString('en-NG', {minimumFractionDigits:0,maximumFractionDigits:0}); }
+function fmtDate(ts) {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString('en-NG', {day:'2-digit',month:'short',year:'numeric'});
+}
+function fmtDateTime(ts) {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleString('en-NG', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function statusBadge(s) {
+  const map = { active:'badge-blue', resolved:'badge-green', cancelled:'badge-gray', pending:'badge-yellow', approved:'badge-green', rejected:'badge-red', won:'badge-green', lost:'badge-red', refunded:'badge-gray', banned:'badge-red' };
+  return `<span class="badge ${map[s]||'badge-gray'}">${s}</span>`;
+}
+function toast(msg, type='') {
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.innerHTML = (type==='success'?'✅':type==='error'?'❌':type==='warn'?'⚠️':'ℹ️') + ' ' + msg;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(()=>t.remove(), 3500);
+}
+window.toast = toast;
+
+// ── Auth ──
+window.doLogin = async function() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass = document.getElementById('auth-pass').value;
+  const btn = document.getElementById('auth-btn');
+  const err = document.getElementById('auth-error');
+  if (!email || !pass) { err.textContent = 'Please enter email and password.'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in...'; err.textContent = '';
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+  } catch(e) {
+    err.textContent = e.message.replace('Firebase: ','');
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+};
+window.doSignOut = async function() { await signOut(auth); };
+window.doDeniedSignout = async function() { await signOut(auth); document.getElementById('denied-screen').style.display='none'; document.getElementById('auth-screen').style.display='flex'; };
+
+document.getElementById('auth-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+onAuthStateChanged(auth, user => {
+  if (user) {
+    if (user.email !== ADMIN_EMAIL) {
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('denied-screen').style.display = 'flex';
+      document.getElementById('app').classList.remove('visible');
+    } else {
+      window._currentUser = user;
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('denied-screen').style.display = 'none';
+      document.getElementById('app').classList.add('visible');
+      document.getElementById('admin-email-display').textContent = user.email;
+      initApp();
+    }
+  } else {
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('denied-screen').style.display = 'none';
+    document.getElementById('app').classList.remove('visible');
+    document.getElementById('auth-btn').disabled = false;
+    document.getElementById('auth-btn').textContent = 'Sign In';
+  }
+});
+
+// ── Navigation ──
+document.querySelectorAll('.nav-item[data-section]').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    el.classList.add('active');
+    const sec = el.dataset.section;
+    document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+    document.getElementById('sec-'+sec).classList.add('active');
+    document.getElementById('topbar-title').textContent = el.textContent.trim().replace(/^\p{Emoji}/u,'').trim();
+  });
+});
+
+// Filter tabs
+document.querySelectorAll('.filter-tabs').forEach(tabs => {
+  tabs.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      const id = tabs.id;
+      const val = tab.dataset.val;
+      if (id==='bets-filter') { window._currentBetFilter = val; renderBets(); }
+      if (id==='deposits-filter') { window._currentDepFilter = val; renderDeposits(); }
+      if (id==='withdrawals-filter') { window._currentWdFilter = val; renderWithdrawals(); }
+    });
+  });
+});
+
+// Broadcast tabs
+document.querySelectorAll('.bc-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.bc-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const v = tab.dataset.bc;
+    document.getElementById('bc-all').style.display = v==='all'?'block':'none';
+    document.getElementById('bc-specific').style.display = v==='specific'?'block':'none';
+  });
+});
+
+// Clock
+function updateClock() {
+  document.getElementById('topbar-time').textContent = new Date().toLocaleTimeString('en-NG', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(updateClock, 1000); updateClock();
+window.toggleDropdown = function() {
+  const d = document.getElementById('dropdown-menu');
+  const o = document.getElementById('dropdown-overlay');
+  const isOpen = d.style.display !== 'none';
+  d.style.display = isOpen ? 'none' : 'block';
+  o.style.display = isOpen ? 'none' : 'block';
+};
+window.goTo = function(sec) {
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const navEl = document.querySelector(`.nav-item[data-section="${sec}"]`);
+  if (navEl) navEl.classList.add('active');
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('sec-'+sec).classList.add('active');
+  document.getElementById('topbar-title').textContent = sec.charAt(0).toUpperCase()+sec.slice(1);
+  document.getElementById('dropdown-menu').style.display = 'none';
+  document.getElementById('dropdown-overlay').style.display = 'none';
+  // load users only when tab is first visited
+  if(sec === 'users' && !window._allUsersCache?.length && window._adminLoadUsers) window._adminLoadUsers();
+};
+document.addEventListener('click', e => {
+  if (!e.target.closest('#menu-btn') && !e.target.closest('#dropdown-menu')) {
+    const d = document.getElementById('dropdown-menu');
+    if (d) d.style.display = 'none';
+  }
+});
+// ── Modals ──
+window.openModal = function(id) { document.getElementById(id).classList.add('open'); };
+window.closeModal = function(id) { document.getElementById(id).classList.remove('open'); };
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); });
+});
+
+// ── INIT APP ──
+function initApp() {
+  listenDashboard();
+  listenMarkets();
+  listenUsers(); // sets up _adminLoadUsers but doesn't fetch yet
+  listenBets();
+  listenDeposits();
+  listenWithdrawals();
+  listenNotifHistory();
+  listenTelegramMarkets();
+  loadVerificationRequests();
+  loadVerificationHistory();
+}
+async function loadVerificationRequests(){
+  try {
+    const snap = await getDocs(query(collection(db,'verificationRequests'), where('status','==','pending'), orderBy('appliedAt','desc')));
+    const list = snap.docs.map(d=>({id:d.id,...d.data()}));
+    const badge = document.getElementById('badge-verifications');
+    if(badge){ badge.textContent=list.length; badge.style.display=list.length>0?'':'none'; }
+    const el = document.getElementById('verifications-list');
+    if(!el) return;
+    if(!list.length){ el.innerHTML='<p style="color:#64748b;padding:1rem">No pending verification requests.</p>'; return; }
+    el.innerHTML = list.map(v=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;border-radius:12px;background:rgba(37,99,235,0.04);margin-bottom:0.75rem;border:1px solid rgba(37,99,235,0.1)">
+        <div>
+          <div style="font-weight:700">${v.username||v.uid}</div>
+          <div style="font-size:0.8rem;color:#64748b">Bets: ${v.totalBets||0} | Wins: ${v.wins||0} | Applied: ${fmtDate(v.appliedAt)}</div>
+        </div>
+        <div style="display:flex;gap:0.5rem">
+          <button class="btn btn-success btn-sm" onclick="approveVerification('${v.id}','${v.uid}')">✅ Approve</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectVerification('${v.id}','${v.uid}')">❌ Reject</button>
+        </div>
+      </div>`).join('');
+  } catch(e){ console.error('loadVerificationRequests error:',e.message); }
+}
+window.approveVerification = async function(reqId, uid){
+  try {
+    await updateDoc(doc(db,'verificationRequests',reqId),{status:'approved', reviewedAt: serverTimestamp()});
+    await updateDoc(doc(db,'users',uid),{verified:true, verificationStatus:'approved'});
+    toast('User verified! ✅','success');
+    loadVerificationRequests();
+    loadVerificationHistory();
+  } catch(e){ toast('Error: '+e.message,'error'); }
+};
+window.rejectVerification = async function(reqId, uid){
+  try {
+    await updateDoc(doc(db,'verificationRequests',reqId),{status:'rejected', reviewedAt: serverTimestamp()});
+    await updateDoc(doc(db,'users',uid),{verificationStatus:'rejected'});
+    toast('Verification rejected.','warn');
+    loadVerificationRequests();
+    loadVerificationHistory();
+  } catch(e){ toast('Error: '+e.message,'error'); }
+};
+async function loadVerificationHistory(){
+  try {
+    const snap = await getDocs(query(collection(db,'verificationRequests'), where('status','in',['approved','rejected']), orderBy('appliedAt','desc'), limit(20)));
+    const el = document.getElementById('verifications-history');
+    if(!el) return;
+    if(snap.empty){ el.innerHTML='<p style="color:#64748b;padding:1rem">No reviewed requests yet.</p>'; return; }
+    el.innerHTML = snap.docs.map(d=>{
+      const v = {id:d.id,...d.data()};
+      const badge = v.status==='approved' ? '<span class="badge badge-green">✅ Approved</span>' : '<span class="badge badge-red">❌ Rejected</span>';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;border-radius:10px;background:rgba(37,99,235,0.03);margin-bottom:0.5rem;border:1px solid rgba(37,99,235,0.07)">
+        <div>
+          <div style="font-weight:600;font-size:0.9rem">${v.username||v.uid}</div>
+          <div style="font-size:0.75rem;color:#64748b">Bets: ${v.totalBets||0} · Wins: ${v.wins||0} · Applied: ${fmtDate(v.appliedAt)}</div>
+        </div>
+        ${badge}
+      </div>`;
+    }).join('');
+  } catch(e){ console.error('loadVerificationHistory error:',e.message); }
+}
+
+// ── DASHBOARD ──
+function listenDashboard() {
+  loadDashboardStats();
+  setInterval(loadDashboardStats, 5 * 60 * 1000);
+}
+async function loadDashboardStats() {
+  try {
+    const [usersSnap, betsSnap, depositsSnap, withdrawalsSnap, marketsSnap] = await Promise.all([
+      getDocs(query(collection(db,'users'), orderBy('createdAt','desc'), limit(500))),
+      getDocs(query(collection(db,'bets'), orderBy('createdAt','desc'), limit(500))),
+      getDocs(query(collection(db,'depositRequests'), where('status','==','approved'))),
+      getDocs(query(collection(db,'withdrawals'), where('status','==','approved'))),
+      getDocs(query(collection(db,'markets'), where('status','==','active'), limit(100)))
+    ]);
+    document.getElementById('stat-users').textContent = usersSnap.size + (usersSnap.size >= 500 ? '+' : '');
+    document.getElementById('stat-bets').textContent = betsSnap.size + (betsSnap.size >= 500 ? '+' : '');
+    let totalDep = 0;
+    depositsSnap.forEach(d => totalDep += Number(d.data().amount||0));
+    document.getElementById('stat-deposited').textContent = fmt(totalDep);
+    let totalWd = 0;
+    withdrawalsSnap.forEach(d => totalWd += Number(d.data().amount||0));
+    document.getElementById('stat-withdrawn').textContent = fmt(totalWd);
+    let poolTotal = 0;
+    let html = '';
+    if (marketsSnap.empty) { html = '<div class="empty-state"><div class="e-icon">📊</div><div class="e-msg">No active markets</div></div>'; }
+    else {
+      html = '<div class="table-wrapper"><table><thead><tr><th>Market</th><th>YES Pool</th><th>NO Pool</th><th>Total</th></tr></thead><tbody>';
+      marketsSnap.forEach(d => {
+        const m=d.data();
+        const tot = Number(m.totalPool||0) || (Number(m.yesPool||0)+Number(m.noPool||0));
+        poolTotal += tot;
+        html += `<tr><td><span class="text-truncate">${m.question||'Untitled'}</span></td><td>${fmt(m.yesPool)}</td><td>${fmt(m.noPool)}</td><td class="fw-6">${fmt(tot)}</td></tr>`;
+      });
+      html += '</tbody></table></div>';
+    }
+    document.getElementById('stat-pool').textContent = fmt(poolTotal);
+    document.getElementById('dashboard-markets-list').innerHTML = html;
+  } catch(e) { console.error('loadDashboardStats error:', e.message); }
+}
+
+// ── MARKETS ──
+let _markets = {};
+async function listenMarkets() {
+  try {
+    // Fetch ALL markets from Firestore (admin needs resolved + active)
+    const snap = await getDocs(query(collection(db,'markets'), orderBy('createdAt','desc'), limit(200)));
+    _markets = {};
+    snap.docs.forEach(d => { _markets[d.id] = {id:d.id,...d.data()}; });
+    console.log('Markets loaded:', snap.docs.length);
+    renderMarketsTable();
+  } catch(e) {
+    console.error('listenMarkets fetch error:', e.message, e.code);
+    const tbody = document.getElementById('markets-tbody');
+    if(tbody) tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="e-msg" style="color:red">Error: ${e.message}</div></div></td></tr>`;
+  }
+}
+async function refreshMarketCache() {
+  try {
+    const res = await fetch('https://crediplex-production.up.railway.app/api/markets/refresh', { method: 'POST' });
+    const data = await res.json();
+    alert('Cache refreshed: ' + (data.count || '?') + ' markets loaded.');
+    await listenMarkets();
+  } catch(e) {
+    alert('Refresh failed: ' + e.message);
+  }
+}
+let _marketSourceFilter = 'all';
+let _marketSearchQuery = '';
+function filterMarketsTable(){
+  _marketSearchQuery = (document.getElementById('markets-search')?.value || '').toLowerCase();
+  renderMarketsTable();
+}
+function renderMarketsTable() {
+  const tbody = document.getElementById('markets-tbody');
+  let mArr = Object.values(_markets).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  if(_marketSourceFilter === 'polymarket') mArr = mArr.filter(m=>m.source==='polymarket');
+  if(_marketSourceFilter === 'crediplex') mArr = mArr.filter(m=>m.source!=='polymarket');
+  if(_marketSearchQuery) mArr = mArr.filter(m=>(m.question||'').toLowerCase().includes(_marketSearchQuery)||(m.category||'').toLowerCase().includes(_marketSearchQuery));
+  if (!mArr.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="e-icon">🏦</div><div class="e-msg">No markets yet</div></div></td></tr>'; return; }
+  tbody.innerHTML = mArr.map(m => {
+    const tot = Number(m.totalPool||0) || (Number(m.yesPool||0)+Number(m.noPool||0));
+    const actions = m.status==='active'
+      ? `<button class="btn btn-success btn-sm" onclick="openResolve('${m.id}')">✅ Resolve</button>
+         <button class="btn btn-warn btn-sm" onclick="cancelMarket('${m.id}')">🔄 Cancel</button>`
+      : `<span class="text-muted" style="font-size:12px">${m.status==='resolved'?'Resolved':'Cancelled'}</span>`;
+    return `<tr>
+      <td><span class="text-truncate" title="${m.question}">${m.question}</span></td>
+      <td>${m.category||'—'}</td>
+      <td>${statusBadge(m.status)}</td>
+      <td>${m.outcomeCount > 2 ? `${m.outcomeCount} outcomes` : 'YES / NO'}</td>
+      <td class="fw-6">${fmt(tot)}</td>
+      <td>${fmtDate(m.deadline)}</td>
+      <td><span class="mkt-cd" data-deadline="${m.deadline?.seconds||m.deadline?._seconds||0}" style="font-size:0.75rem;font-weight:700;color:${m.status==='active'?'#f59e0b':'#94a3b8'}">—</span></td>
+      <td><div class="td-actions">${actions}</div></td>
+    </tr>`;
+  }).join('');
+  // Start countdown tickers for all active markets
+  document.querySelectorAll('.mkt-cd').forEach(el=>{
+    const sec = Number(el.dataset.deadline);
+    if(!sec) return;
+    const tick = ()=>{
+      const diff = sec*1000 - Date.now();
+      if(diff <= 0){ el.textContent='Ended'; el.style.color='#ef4444'; return; }
+      const d=Math.floor(diff/86400000), h=Math.floor(diff%86400000/3600000), m=Math.floor(diff%3600000/60000);
+      el.textContent = d>0?`${d}d ${h}h`:h>0?`${h}h ${m}m`:`${m}m`;
+    };
+    tick();
+    setInterval(tick, 60000);
+  });
+}
+const IMGBB_KEY = '3ba1a55964c6f25793b8c9bd780ce256';
+
+window._mkType = 'binary';
+window.setMkType = function(type){
+  window._mkType = type;
+  const isBinary = type === 'binary';
+  document.getElementById('mk-type-binary').style.background = isBinary ? '#2563eb' : 'white';
+  document.getElementById('mk-type-binary').style.color = isBinary ? 'white' : '#64748b';
+  document.getElementById('mk-type-binary').style.borderColor = isBinary ? '#2563eb' : '#e2e8f0';
+  document.getElementById('mk-type-multi').style.background = !isBinary ? '#2563eb' : 'white';
+  document.getElementById('mk-type-multi').style.color = !isBinary ? 'white' : '#64748b';
+  document.getElementById('mk-type-multi').style.borderColor = !isBinary ? '#2563eb' : '#e2e8f0';
+  document.getElementById('mk-outcomes-section').style.display = isBinary ? 'none' : '';
+};
+window.addMkOutcome = function(){
+  const list = document.getElementById('mk-outcomes-list');
+  const count = list.querySelectorAll('.mk-outcome-row').length + 1;
+  if(count > 70){ toast('Maximum 70 outcomes','warn'); return; }
+  const div = document.createElement('div');
+  div.className = 'mk-outcome-row';
+  div.style.cssText = 'display:flex;gap:8px;align-items:center';
+  div.innerHTML = `<input class="form-control" style="flex:1" placeholder="Outcome ${count}" /><button onclick="removeMkOutcome(this)" style="background:rgba(239,68,68,0.1);border:none;color:#dc2626;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;flex-shrink:0">✕</button>`;
+  list.appendChild(div);
+};
+window.removeMkOutcome = function(btn){
+  const row = btn.closest('.mk-outcome-row');
+  const list = document.getElementById('mk-outcomes-list');
+  if(list.querySelectorAll('.mk-outcome-row').length > 2){
+    row.remove();
+  } else {
+    toast('Need at least 2 outcomes','warn');
+  }
+};
+
+window.previewImg = function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('mk-img-thumb').src = e.target.result;
+    document.getElementById('mk-img-preview').style.display = 'flex';
+    document.getElementById('mk-img-preview').style.alignItems = 'center';
+  };
+  reader.readAsDataURL(file);
+};
+
+async function uploadToImgbb(file) {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`, { method:'POST', body:formData });
+  const data = await res.json();
+  if (data.success) return data.data.url;
+  throw new Error('Image upload failed');
+}
+
+window.createMarket = async function() {
+  const q = document.getElementById('mk-question').value.trim();
+  const cat = document.getElementById('mk-category').value;
+  const dl = document.getElementById('mk-deadline').value;
+  const desc = document.getElementById('mk-desc').value.trim();
+  const imgFile = document.getElementById('mk-img-file').files[0];
+  const mkType = window._mkType || 'binary';
+  if (!q || !dl) { toast('Please fill in question and deadline','warn'); return; }
+
+  // collect outcomes
+  let outcomesArr = ['Yes','No'];
+  if(mkType === 'multi'){
+    const inputs = document.querySelectorAll('#mk-outcomes-list .mk-outcome-row input');
+    outcomesArr = Array.from(inputs).map(i=>i.value.trim()).filter(v=>v.length>0);
+    if(outcomesArr.length < 2){ toast('Add at least 2 outcomes','warn'); return; }
+  }
+
+  try {
+    const statusEl = document.getElementById('mk-img-status');
+    let imageUrl = '';
+    if (imgFile) {
+      if (statusEl) { statusEl.textContent = '⏳ Uploading image...'; statusEl.style.color='#f59e0b'; }
+      imageUrl = await uploadToImgbb(imgFile);
+      if (statusEl) { statusEl.textContent = '✅ Uploaded!'; statusEl.style.color='#10b981'; }
+    }
+
+    // build pool keys for multi-outcome
+    const poolsObj = { yesPool:0, noPool:0 };
+    if(mkType === 'multi'){
+      outcomesArr.forEach(o=>{
+        const key = 'pool_' + o.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
+        poolsObj[key] = 0;
+      });
+    }
+
+    const newMarketRef = await addDoc(collection(db,'markets'), {
+      question:q, category:cat,
+      deadline: Timestamp.fromDate(new Date(dl)),
+      description:desc,
+      outcomes: JSON.stringify(outcomesArr),
+      outcomeCount: outcomesArr.length,
+      outcomePrices: JSON.stringify(outcomesArr.map(()=>0)),
+      ...poolsObj,
+      status:'active', imageUrl, createdAt:serverTimestamp(),
+      source: 'crediplex'
+    });
+    // add slug after we have the doc id
+    const slug = slugify(q) + '-' + newMarketRef.id.substring(0,6);
+    await updateDoc(newMarketRef, { slug });
+
+    closeModal('modal-create-market');
+    document.getElementById('mk-question').value='';
+    document.getElementById('mk-desc').value='';
+    document.getElementById('mk-deadline').value='';
+    document.getElementById('mk-img-file').value='';
+    document.getElementById('mk-img-preview').style.display='none';
+    // reset type
+    setMkType('binary');
+    toast(`Market created! (${outcomesArr.length} outcomes)`,'success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+};
+
+window.openResolve = function(id) {
+  const m = _markets[id];
+  if (!m) return;
+  window._resolveMarketId = id;
+  window._resolveMarketData = m;
+  window._resolveWinner = null;
+
+  // Parse outcomes
+  let outcomesArr = ['Yes', 'No'];
+  try {
+    const parsed = JSON.parse(m.outcomes || '[]');
+    if (Array.isArray(parsed) && parsed.length >= 2) outcomesArr = parsed;
+  } catch(e){}
+
+  const isBinary = outcomesArr.length === 2 &&
+    outcomesArr[0].toLowerCase() === 'yes' &&
+    outcomesArr[1].toLowerCase() === 'no';
+
+  // Build pool summary
+  let poolSummary = '';
+  if (isBinary) {
+    poolSummary = `YES: ${fmt(m.yesPool)} | NO: ${fmt(m.noPool)}`;
+  } else {
+    poolSummary = `Total pool: ${fmt(Number(m.totalPool||0) || outcomesArr.reduce((s,o)=>{
+      const key = 'pool_' + o.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
+      return s + Number(m[key]||0);
+    }, 0))}`;
+  }
+
+  document.getElementById('resolve-market-info').innerHTML = `
+    <div class="n-target">Resolving Market</div>
+    <div class="n-title">${m.question}</div>
+    <div class="n-meta">${poolSummary}</div>`;
+
+  // Build outcome picker buttons
+  const picker = document.getElementById('resolve-outcomes-picker');
+  const colors = ['#10b981','#2563eb','#7c3aed','#f59e0b','#ef4444','#0891b2','#db2777','#65a30d'];
+
+  picker.innerHTML = outcomesArr.map((o, i) => {
+    const poolKey = isBinary
+      ? (o.toLowerCase() === 'yes' ? 'yesPool' : 'noPool')
+      : 'pool_' + o.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
+    const poolAmt = fmt(Number(m[poolKey]||0));
+    const col = colors[i % colors.length];
+    return `<button
+      onclick="selectResolveWinner('${o.replace(/'/g,"\\'")}', this)"
+      style="flex:1;min-width:120px;padding:12px 16px;border-radius:10px;border:2px solid ${col};
+             background:transparent;color:${col};font-weight:700;font-size:13px;cursor:pointer;
+             font-family:'DM Sans',sans-serif;transition:all 0.2s;text-align:center"
+      data-outcome="${o.replace(/"/g,'&quot;')}">
+      <div style="font-size:15px;margin-bottom:3px">${o}</div>
+      <div style="font-size:11px;opacity:0.8">${poolAmt} pooled</div>
+    </button>`;
+  }).join('');
+
+  openModal('modal-resolve-market');
+};
+
+window.selectResolveWinner = function(outcome, btn) {
+  window._resolveWinner = outcome;
+  // highlight selected
+  btn.parentElement.querySelectorAll('button').forEach(b => {
+    b.style.background = 'transparent';
+    b.style.color = b.style.borderColor;
+    b.style.fontWeight = '700';
+  });
+  btn.style.background = btn.style.borderColor;
+  btn.style.color = 'white';
+};
+
+window.resolveMarket = async function() {
+  const id = window._resolveMarketId;
+  const m = window._resolveMarketData;
+  const winner = window._resolveWinner;
+  if (!winner) { toast('Please select a winning outcome','warn'); return; }
+
+  // Parse outcomes to determine if binary or multi
+  let outcomesArr = ['Yes','No'];
+  try {
+    const parsed = JSON.parse(m.outcomes || '[]');
+    if (Array.isArray(parsed) && parsed.length >= 2) outcomesArr = parsed;
+  } catch(e){}
+
+  const isBinary = outcomesArr.length === 2 &&
+    outcomesArr[0].toLowerCase() === 'yes' &&
+    outcomesArr[1].toLowerCase() === 'no';
+
+  // Calculate total pool and winning pool
+  let totalPool = 0;
+  let winningSidePool = 0;
+
+  if (isBinary) {
+    const yesPool = Number(m.yesPool||0);
+    const noPool = Number(m.noPool||0);
+    totalPool = yesPool + noPool;
+    winningSidePool = winner.toLowerCase() === 'yes' ? yesPool : noPool;
+  } else {
+    // Sum all pool_ keys for total
+    outcomesArr.forEach(o => {
+      const key = 'pool_' + o.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
+      totalPool += Number(m[key]||0);
+    });
+    // Use stored totalPool if available (more accurate)
+    if (m.totalPool && Number(m.totalPool) > 0) totalPool = Number(m.totalPool);
+
+    const winKey = 'pool_' + winner.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
+    winningSidePool = Number(m[winKey]||0);
+  }
+
+  if (totalPool === 0) { toast('No bets placed on this market','warn'); return; }
+
+  // Fee deducted per-user at resolution based on profit
+
+  try {
+    const betsQ = query(collection(db,'bets'), where('marketId','==',id), where('status','==','pending'));
+    const betsSnap = await getDocs(betsQ);
+
+    if (betsSnap.empty) {
+      // No pending bets — just mark resolved
+      await updateDoc(doc(db,'markets',id), { status:'resolved', result: winner });
+      closeModal('modal-resolve-market');
+      toast('Market resolved (no pending bets).','success');
+      return;
+    }
+
+    await runTransaction(db, async (tx) => {
+      betsSnap.forEach(betDoc => {
+        const b = betDoc.data();
+        const betRef = doc(db,'bets',betDoc.id);
+        const userRef = doc(db,'users',b.uid);
+
+        // Compare bet side to winner — case-insensitive, trim
+        const betSide = (b.side||'').trim();
+        const isWinner = isBinary
+          ? betSide.toLowerCase() === winner.toLowerCase()
+          : betSide.toLowerCase() === winner.toLowerCase() ||
+            betSide === winner; // exact match for multi-outcome
+
+        if (isWinner) {
+          // Payout: proportional share of net pool
+          const rawWinAmt = winningSidePool > 0
+            ? Math.floor((totalPool / winningSidePool) * Number(b.amount||0))
+            : Number(b.amount||0);
+          const bProfit = rawWinAmt - Number(b.amount||0);
+          const bProfitPct = Number(b.amount||0) > 0 ? (bProfit / Number(b.amount||0)) * 100 : 0;
+          const platformFee = bProfitPct > 10 ? Math.floor(bProfit * 0.10) : 0;
+          if(platformFee > 0){
+  const adminFeeRef = doc(collection(db,'transactions'));
+  tx.set(adminFeeRef, {
+    uid: 'WEw1TEQXJhZhmls7ppb4D0zxMv62',
+    type: 'platform_fee',
+    amount: platformFee,
+    fromUser: b.uid,
+    marketId: id,
+    note: 'Platform fee from bet win',
+    createdAt: serverTimestamp()
+  });
+  tx.update(doc(db,'users','WEw1TEQXJhZhmls7ppb4D0zxMv62'), {
+    balance: increment(platformFee)
+  });
+}
+
+          tx.update(betRef, { status:'won', winAmount: winAmt });
+          tx.update(doc(db,'users',b.uid), {
+            balance: increment(winAmt),
+            wins: increment(1),
+            profit: increment(bProfit - platformFee)
+          });
+          const txRef = doc(collection(db,'transactions'));
+          tx.set(txRef, {
+            uid: b.uid, type:'win_payout', amount: winAmt,
+            marketId: id, betId: betDoc.id,
+            note: `Won: ${m.question} → ${winner}`,
+            createdAt: serverTimestamp()
+          });
+        } else {
+          tx.update(betRef, { status:'lost' });
+          tx.update(userRef, {
+            losses: increment(1),
+            profit: increment(-Number(b.amount||0))
+          });
+        }
+      });
+
+      tx.update(doc(db,'markets',id), {
+        status: 'resolved',
+        result: winner,
+        resolvedAt: serverTimestamp()
+      });
+    });
+
+    closeModal('modal-resolve-market');
+    const winners = betsSnap.docs.filter(d => {
+      const side = (d.data().side||'').trim();
+      return isBinary
+        ? side.toLowerCase() === winner.toLowerCase()
+        : side.toLowerCase() === winner.toLowerCase() || side === winner;
+    }).length;
+    toast(`✅ Resolved! "${winner}" wins. ${winners} bets paid out.`, 'success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+};
+
+window.cancelMarket = async function(id) {
+  if (!confirm('Cancel this market and refund all bets?')) return;
+  const m = _markets[id];
+  try {
+    const betsQ = query(collection(db,'bets'), where('marketId','==',id), where('status','==','pending'));
+    const betsSnap = await getDocs(betsQ);
+    await runTransaction(db, async (tx) => {
+      betsSnap.forEach(betDoc => {
+        const b = betDoc.data();
+        const betRef = doc(db,'bets',betDoc.id);
+        tx.update(betRef, { status:'refunded' });
+        tx.update(doc(db,'users',b.uid), { balance: increment(Number(b.amount||0)) });
+        const txRef = doc(collection(db,'transactions'));
+        tx.set(txRef, { uid:b.uid, type:'refund', amount:b.amount, marketId:id, betId:betDoc.id, note:`Refund: ${m?.question}`, createdAt:serverTimestamp() });
+      });
+      tx.update(doc(db,'markets',id), { status:'cancelled' });
+    });
+    toast('Market cancelled & all bets refunded!','success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+};
+
+// ── USERS ──
+function listenUsers() {
+  async function loadUsers(){
+    if(window._usersLoading) return;
+    window._usersLoading = true;
+    const snap = await getDocs(query(collection(db,'users'), orderBy('createdAt','desc'), limit(200)));
+    window._allUsersCache = snap.docs.map(d=>({...d.data(), id:d.id}));
+    window._usersLoading = false;
+    filterUsers();
+  }
+  window._adminLoadUsers = loadUsers;
+  // don't auto-load — wait until users tab is clicked
+}
+window.filterUsers = function() {
+  const q = (document.getElementById('users-search')?.value||'').toLowerCase();
+  const list = q ? window._allUsersCache.filter(u => (u.username||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)) : window._allUsersCache;
+  renderUsersTable(list);
+};
+function renderUsersTable(list) {
+  const tbody = document.getElementById('users-tbody');
+  if (!list.length) { tbody.innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="e-icon">👥</div><div class="e-msg">No users found</div></div></td></tr>'; return; }
+  tbody.innerHTML = list.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)).map(u => {
+    const banned = u.banned===true;
+    return `<tr>
+      <td>${u.username||'—'}</td>
+      <td>${u.email||'—'}</td>
+      <td class="fw-6">${fmt(u.balance)}</td>
+      <td>${u.totalBets||0}</td>
+      <td>${u.wins||0}</td>
+      <td>${statusBadge(banned?'banned':'active')}</td>
+      <td>${fmtDate(u.createdAt||u.joinedAt)}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-primary btn-sm" onclick="openAddBalance('${u.id}','${(u.username||'').replace(/'/g,"\\'")}')">💰 Balance</button>
+        ${banned
+          ? `<button class="btn btn-success btn-sm" onclick="unbanUser('${u.id}')">✅ Unban</button>`
+          : `<button class="btn btn-warn btn-sm" onclick="banUser('${u.id}')">🚫 Ban</button>`}
+        <button class="btn btn-danger btn-sm" onclick="openDeleteUser('${u.id}','${(u.username||'').replace(/'/g,"\\'")}')">🗑️</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+window.openAddBalance = function(uid, name) {
+  window._addBalanceUid = uid;
+  document.getElementById('add-bal-user-info').innerHTML = `<div class="n-title">Adding balance to: <b>${name}</b></div>`;
+  document.getElementById('add-bal-amount').value = '';
+  document.getElementById('add-bal-note').value = '';
+  openModal('modal-add-balance');
+};
+window.addBalance = async function() {
+  const uid = window._addBalanceUid;
+  const amount = Number(document.getElementById('add-bal-amount').value);
+  const note = document.getElementById('add-bal-note').value.trim() || 'Admin credit';
+  if (!amount || amount<=0) { toast('Enter a valid amount','warn'); return; }
+  try {
+    await updateDoc(doc(db,'users',uid), { balance: increment(amount) });
+    await addDoc(collection(db,'transactions'), { uid, type:'admin_credit', amount, note, createdAt:serverTimestamp() });
+    closeModal('modal-add-balance');
+    toast(fmt(amount)+' added to user balance!','success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+};
+window.banUser = async function(uid) {
+  if (!confirm('Ban this user?')) return;
+  await updateDoc(doc(db,'users',uid), { banned:true });
+  toast('User banned.','warn');
+};
+window.unbanUser = async function(uid) {
+  await updateDoc(doc(db,'users',uid), { banned:false });
+  toast('User unbanned.','success');
+};
+window.openDeleteUser = function(uid, name) {
+  window._deleteUid = uid;
+  document.getElementById('del-user-info').innerHTML = `<div class="n-title">Delete: <b>${name}</b></div><div class="n-meta" style="margin-top:4px">UID: ${uid}</div>`;
+  openModal('modal-delete-user');
+};
+window.deleteUser = async function() {
+  const uid = window._deleteUid;
+  try {
+    const colls = ['bets','transactions','depositRequests','withdrawals','notifications'];
+    for (const c of colls) {
+      const q = query(collection(db,c), where('uid','==',uid));
+      const snap = await getDocs(q);
+      for (const d of snap.docs) await deleteDoc(d.ref);
+    }
+    await deleteDoc(doc(db,'users',uid));
+    closeModal('modal-delete-user');
+    toast('User data deleted. Remove Auth account from Firebase Console.','success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+};
+
+// ── BETS ──
+function listenBets() {
+  async function loadBets(){
+    const snap = await getDocs(query(collection(db,'bets'), orderBy('createdAt','desc'), limit(300)));
+    window._allBetsCache = snap.docs.map(d=>({...d.data(), id:d.id}));
+    renderBets();
+  }
+  loadBets();
+  // Server auto-resolves bets — admin view only needs occasional refresh
+  const betsInterval = setInterval(loadBets, 5*60*60*1000);
+  window._adminBetsInterval = betsInterval;
+}
+function renderBets() {
+  const filter = window._currentBetFilter;
+  let list = window._allBetsCache;
+  if (filter!=='all') list = list.filter(b=>b.status===filter);
+  list.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+
+  // Summary
+  const counts = {};
+  ['pending','won','lost','refunded'].forEach(s=>counts[s]=0);
+  window._allBetsCache.forEach(b=>{if(counts[b.status]!==undefined)counts[b.status]++;});
+  document.getElementById('bets-summary').innerHTML =
+    Object.entries(counts).map(([s,c])=>`<div class="summary-item"><div class="s-label">${s}</div><div class="s-val">${c}</div></div>`).join('');
+
+  const tbody = document.getElementById('bets-tbody');
+  if (!list.length) { tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><div class="e-icon">🎯</div><div class="e-msg">No bets found</div></div></td></tr>'; return; }
+  tbody.innerHTML = list.map(b => {
+    const user = window._allUsersCache.find(u=>u.id===b.uid);
+    const market = _markets[b.marketId];
+    const sideB = (b.side||'').toUpperCase();
+    const potential = b.potentialPayout || b.winAmount || '—';
+    return `<tr>
+      <td>${user?.username||b.uid?.substring(0,8)||'—'}</td>
+      <td><span class="text-truncate" title="${market?.question||b.marketId}">${market?.question||b.marketId||'—'}</span></td>
+      <td><span class="badge ${sideB==='YES'?'badge-green':'badge-red'}">${sideB}</span></td>
+      <td class="fw-6">${fmt(b.amount)}</td>
+      <td>${typeof potential==='number'?fmt(potential):potential}</td>
+      <td>${statusBadge(b.status)}</td>
+      <td>${fmtDate(b.createdAt)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── DEPOSITS ──
+function listenDeposits() {
+  async function loadDeposits(){
+    window._adminForceLoadDeposits = loadDeposits;
+    const snap = await getDocs(query(collection(db,'depositRequests'), orderBy('createdAt','desc'), limit(200)));
+    window._allDepositsCache = snap.docs.map(d=>({...d.data(), id:d.id}));
+    const pending = window._allDepositsCache.filter(x=>x.status==='pending').length;
+    const badge = document.getElementById('badge-deposits');
+    badge.textContent = pending; badge.style.display = pending>0?'':'none';
+    renderDeposits();
+  }
+  loadDeposits();
+  const depInterval = setInterval(loadDeposits, 3*60*60*1000);
+  window._adminDepositsInterval = depInterval;
+}
+function renderDeposits() {
+  const filter = window._currentDepFilter;
+  const list = window._allDepositsCache.filter(d=>d.status===filter).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  const tbody = document.getElementById('deposits-tbody');
+  if (!list.length) { tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="e-icon">💳</div><div class="e-msg">No ${filter} deposits</div></div></td></tr>`; return; }
+  tbody.innerHTML = list.map(d => {
+    const user = window._allUsersCache.find(u=>u.id===d.uid);
+    const actions = d.status==='pending'
+      ? `<button class="btn btn-success btn-sm" onclick="approveDeposit('${d.id}','${d.uid}',${d.amount})">✅ Approve</button>
+         <button class="btn btn-danger btn-sm" onclick="rejectDeposit('${d.id}')">❌ Reject</button>`
+      : statusBadge(d.status);
+    return `<tr>
+      <td>${user?.username||'—'}</td>
+      <td>${user?.email||d.email||'—'}</td>
+      <td>${d.senderName||'—'}</td>
+      <td class="fw-6">${fmt(d.amount)}</td>
+      <td>${fmtDateTime(d.createdAt)}</td>
+      <td>${statusBadge(d.status)}</td>
+      <td><div class="td-actions">${actions}</div></td>
+    </tr>`;
+  }).join('');
+}
+window.approveDeposit = async function(id, uid, amount) {
+  if (!confirm(`Approve deposit of ${fmt(amount)}?`)) return;
+  try {
+    await updateDoc(doc(db,'depositRequests',id), { status:'approved' });
+    await updateDoc(doc(db,'users',uid), { balance: increment(Number(amount)) });
+    await addDoc(collection(db,'transactions'), { uid, type:'deposit', amount:Number(amount), note:'Deposit approved', createdAt:serverTimestamp() });
+    toast('Deposit approved!','success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+};
+window.rejectDeposit = async function(id) {
+  if (!confirm('Reject this deposit?')) return;
+  await updateDoc(doc(db,'depositRequests',id), { status:'rejected' });
+  toast('Deposit rejected.','warn');
+};
+
+// ── WITHDRAWALS ──
+function listenWithdrawals() {
+  async function loadWithdrawals(){
+    window._adminForceLoadWithdrawals = loadWithdrawals;
+    const snap = await getDocs(query(collection(db,'withdrawals'), orderBy('createdAt','desc'), limit(200)));
+    window._allWithdrawalsCache = snap.docs.map(d=>({...d.data(), id:d.id}));
+    const pending = window._allWithdrawalsCache.filter(x=>x.status==='pending').length;
+    const badge = document.getElementById('badge-withdrawals');
+    badge.textContent = pending; badge.style.display = pending>0?'':'none';
+    renderWithdrawals();
+  }
+  loadWithdrawals();
+  const wdInterval = setInterval(loadWithdrawals, 3*60*60*1000);
+  window._adminWithdrawalsInterval = wdInterval;
+}
+function renderWithdrawals() {
+  const filter = window._currentWdFilter;
+  const list = window._allWithdrawalsCache.filter(w=>w.status===filter).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  const tbody = document.getElementById('withdrawals-tbody');
+  if (!list.length) { tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="e-icon">💸</div><div class="e-msg">No ${filter} withdrawals</div></div></td></tr>`; return; }
+  tbody.innerHTML = list.map(w => {
+    const user = window._allUsersCache.find(u=>u.id===w.uid);
+    const actions = w.status==='pending'
+      ? `<button class="btn btn-success btn-sm" onclick="approveWithdrawal('${w.id}','${w.uid}',${w.amount})">✅ Approve</button>
+         <button class="btn btn-danger btn-sm" onclick="rejectWithdrawal('${w.id}')">❌ Reject</button>`
+      : statusBadge(w.status);
+    return `<tr>
+      <td>${user?.username||'—'}</td>
+      <td class="fw-6">${fmt(w.amount)}</td>
+      <td>${w.bankName||'—'}</td>
+      <td>${w.accountNumber||'—'}</td>
+      <td>${w.accountName||'—'}</td>
+      <td>${fmtDate(w.createdAt)}</td>
+      <td>${statusBadge(w.status)}</td>
+      <td><div class="td-actions">${actions}</div></td>
+    </tr>`;
+  }).join('');
+}
+window.approveWithdrawal = async function(id, uid, amount) {
+  if (!confirm(`Approve withdrawal of ${fmt(amount)}?`)) return;
+  try {
+    await updateDoc(doc(db,'withdrawals',id), { status:'approved' });
+    await updateDoc(doc(db,'users',uid), { balance: increment(-Number(amount)) });
+    await addDoc(collection(db,'transactions'), { uid, type:'withdrawal', amount:-Number(amount), note:'Withdrawal approved', createdAt:serverTimestamp() });
+    toast('Withdrawal approved!','success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+};
+window.rejectWithdrawal = async function(id) {
+  if (!confirm('Reject this withdrawal?')) return;
+  await updateDoc(doc(db,'withdrawals',id), { status:'rejected' });
+  toast('Withdrawal rejected.','warn');
+};
+
+// ── BROADCAST ──
+window.previewBcImg = function(inputId, previewId){
+  const file = document.getElementById(inputId).files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const preview = document.getElementById(previewId);
+    const thumb = document.getElementById(inputId+'-thumb');
+    if(thumb) thumb.src = e.target.result;
+    if(preview){ preview.style.display='flex'; }
+  };
+  reader.readAsDataURL(file);
+};
+
+window.broadcastAll = async function() {
+  const title = document.getElementById('bc-all-title').value.trim();
+  const msg = document.getElementById('bc-all-msg').value.trim();
+  if (!title || !msg) { toast('Please enter title and message','warn'); return; }
+  try {
+    let imageUrl = '';
+    const imgFile = document.getElementById('bc-all-img').files[0];
+    if(imgFile){
+      toast('Uploading image...','');
+      imageUrl = await uploadToImgbb(imgFile);
+    }
+    await addDoc(collection(db,'notifications'), { targetAll:true, title, message:msg, imageUrl, read:false, createdAt:serverTimestamp() });
+    // fire the browser/OS push immediately — don't wait on the 60s server poll
+    fetch('https://crediplex-production.up.railway.app/api/send-push', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ targetAll:true, title, body:msg })
+    }).catch(()=>{});
+    document.getElementById('bc-all-title').value='';
+    document.getElementById('bc-all-msg').value='';
+    document.getElementById('bc-all-img').value='';
+    document.getElementById('bc-all-img-preview').style.display='none';
+    toast('Broadcast sent to all users!','success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+};
+
+window.searchBcUser = function() {
+  const q = (document.getElementById('bc-user-search').value||'').toLowerCase();
+  const cont = document.getElementById('bc-user-result');
+  if (!q) { cont.innerHTML=''; window._bcTargetUser=null; return; }
+  const found = window._allUsersCache.filter(u=>(u.username||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q));
+  if (!found.length) { cont.innerHTML='<div style="font-size:12px;color:var(--text-muted);margin-top:8px">No users found</div>'; window._bcTargetUser=null; return; }
+  const u = found[0];
+  window._bcTargetUser = u;
+  const init = (u.username||u.email||'?')[0].toUpperCase();
+  cont.innerHTML = `<div class="user-result">
+    <div class="ur-avatar">${init}</div>
+    <div><div class="ur-name">${u.username||'—'}</div><div class="ur-email">${u.email||'—'}</div></div>
+    <span class="badge badge-green" style="margin-left:auto">Selected</span>
+  </div>`;
+};
+
+window.sendToSpecific = async function() {
+  const user = window._bcTargetUser;
+  if (!user) { toast('Please search and select a user','warn'); return; }
+  const title = document.getElementById('bc-sp-title').value.trim();
+  const msg = document.getElementById('bc-sp-msg').value.trim();
+  if (!title || !msg) { toast('Please enter title and message','warn'); return; }
+  try {
+    let imageUrl = '';
+    const imgFile = document.getElementById('bc-sp-img').files[0];
+    if(imgFile){
+      toast('Uploading image...','');
+      imageUrl = await uploadToImgbb(imgFile);
+    }
+    await addDoc(collection(db,'notifications'), { targetUid:user.id, uid:user.id, targetAll:false, title, message:msg, imageUrl, read:false, createdAt:serverTimestamp() });
+    // fire the browser/OS push immediately — don't wait on the 60s server poll
+    fetch('https://crediplex-production.up.railway.app/api/send-push', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ uid:user.id, title, body:msg })
+    }).catch(()=>{});
+    document.getElementById('bc-sp-title').value='';
+    document.getElementById('bc-sp-msg').value='';
+    document.getElementById('bc-sp-img').value='';
+    document.getElementById('bc-sp-img-preview').style.display='none';
+    toast(`Message sent to ${user.username||user.email}!`,'success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+};
+// Notification history
+function listenNotifHistory() {
+  getDocs(query(collection(db,'notifications'), orderBy('createdAt','desc'), limit(50))).then(snap => {
+    const cont = document.getElementById('notif-history');
+    if (snap.empty) { cont.innerHTML='<div class="empty-state"><div class="e-icon">📭</div><div class="e-msg">No notifications sent yet</div></div>'; return; }
+    cont.innerHTML = '';
+    snap.forEach(d => {
+      const n = d.data();
+      const target = n.targetAll ? '📢 All Users' : `🎯 ${n.targetUid||'User'}`;
+      const div = document.createElement('div');
+      div.className = 'notif-item';
+      div.innerHTML = `<div class="n-header"><span class="n-target">${target}</span><span class="n-meta">${fmtDateTime(n.createdAt)}</span></div>
+        <div class="n-title">${n.title||'—'}</div>
+        <div class="n-msg">${n.message||'—'}</div>`;
+      cont.appendChild(div);
+    });
+  });
+}
+
+// ── POLYMARKET SYNC ──
+const PROXY_URLS_ADMIN = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  url => `https://thingproxy.freeboard.io/fetch/${url}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
+async function fetchWithProxyAdmin(url){
+  // Try direct first (works if CORS is open on that endpoint)
+  try {
+    const res = await fetch(url, { headers:{ 'Accept':'application/json' }, signal: AbortSignal.timeout(8000) });
+    if(res.ok){
+      const data = await res.json();
+      if(data) return data;
+    }
+  } catch(e){}
+
+  // Proxy fallback chain
+  for(const proxy of PROXY_URLS_ADMIN){
+    try {
+      const res = await fetch(proxy(url), {
+        headers:{ 'Accept':'application/json' },
+        signal: AbortSignal.timeout(12000)
+      });
+      if(!res.ok) continue;
+      const raw = await res.json();
+      let data = raw;
+      if(raw.contents){
+        try { data = JSON.parse(raw.contents); } catch(e){ continue; }
+      }
+      if(data && (Array.isArray(data) || typeof data === 'object')) return data;
+    } catch(e){ continue; }
+  }
+  return null;
+}
+
+function detectCategoryAdmin(question, tags){
+  const q = (question||'').toLowerCase();
+  const t = (tags||[]).join(' ').toLowerCase();
+  const combined = q + ' ' + t;
+  if(t.includes('sports')||t.includes('nba')||t.includes('nfl')||t.includes('soccer')||t.includes('tennis')||t.includes('golf')||t.includes('mma')||t.includes('cricket')||t.includes('esports')) return 'Sports';
+  if(t.includes('election')) return 'Election';
+  if(t.includes('politics')||t.includes('political')) return 'Politics';
+  if(t.includes('crypto')||t.includes('bitcoin')||t.includes('ethereum')||t.includes('defi')) return 'Crypto';
+  if(t.includes('tech')||t.includes('ai')||t.includes('technology')) return 'Tech';
+  if(t.includes('culture')||t.includes('entertainment')||t.includes('pop-culture')) return 'Culture';
+  if(t.includes('economic')||t.includes('economy')) return 'Economic';
+  if(t.includes('business')||t.includes('financial')||t.includes('earnings')) return 'Business';
+  if(t.includes('geopolitical')||t.includes('world')||t.includes('global')) return 'Geopolitical';
+  if(t.includes('weather')) return 'Weather';
+  if(combined.includes('bitcoin')||combined.includes(' btc')||combined.includes('ethereum')||combined.includes(' eth')||combined.includes('solana')||combined.includes(' xrp')||combined.includes('crypto')||combined.includes('defi')) return 'Crypto';
+  if(combined.includes('election')||combined.includes('ballot')) return 'Election';
+  if(combined.includes('war')||combined.includes('ceasefire')||combined.includes('nato')||combined.includes('ukraine')||combined.includes('israel')||combined.includes('gaza')||combined.includes('geopolit')) return 'Geopolitical';
+  if(combined.includes('president')||combined.includes('senate')||combined.includes('congress')||combined.includes('minister')||combined.includes('governor')||combined.includes('parliament')) return 'Politics';
+  if(combined.includes('gdp')||combined.includes('inflation')||combined.includes('interest rate')||combined.includes('fed ')||combined.includes('recession')) return 'Economic';
+  if(combined.includes('stock')||combined.includes('market cap')||combined.includes('revenue')||combined.includes('ipo')||combined.includes('nasdaq')||combined.includes('earnings')) return 'Business';
+  if(combined.includes('ai ')||combined.includes('artificial intelligence')||combined.includes('openai')||combined.includes('gpt')||combined.includes('apple')||combined.includes('google')||combined.includes('microsoft')||combined.includes('meta ')||combined.includes('tesla')) return 'Tech';
+  if(combined.includes('oscar')||combined.includes('grammy')||combined.includes('movie')||combined.includes('award')||combined.includes('album')||combined.includes('singer')||combined.includes('actor')||combined.includes('celebrity')) return 'Culture';
+  if(combined.includes('nba')||combined.includes('nfl')||combined.includes('nhl')||combined.includes('mlb')||combined.includes('soccer')||combined.includes('football')||combined.includes('match')||combined.includes('champion')||combined.includes('world cup')||combined.includes('super bowl')||combined.includes('tennis')||combined.includes('golf')||combined.includes('mma')||combined.includes('cricket')||combined.includes('arsenal')||combined.includes('manchester')||combined.includes('playoff')) return 'Sports';
+  if(combined.includes('weather')||combined.includes('hurricane')||combined.includes('earthquake')||combined.includes('storm')) return 'Weather';
+  if(combined.includes('politics')||combined.includes('political')||combined.includes('policy')) return 'Politics';
+  return 'Others';
+}
+
+window.adminSyncPolymarket = async function(){
+  const btn = document.getElementById('pm-sync-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Syncing...';
+
+  let imported = 0;
+  let updated = 0;
+  let page = 0;
+  const batchSize = 50;
+  let pendingWrites = [];
+  function slugifyAdmin(text){
+    return (text||'').toLowerCase().replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-').replace(/-+/g,'-').substring(0,60);
+  }
+
+  // pre-load all existing polymarket IDs to avoid per-market Firestore reads
+  toast('Loading existing markets...', '');
+  const _existingPmIds = {};
+  const existingSnap = await getDocs(query(collection(db,'markets'), where('source','==','polymarket')));
+  existingSnap.forEach(d => {
+    const pmId = d.data().polymarketId;
+    if(pmId) _existingPmIds[pmId] = d;
+  });
+  toast(`Found ${existingSnap.size} existing Polymarket markets.`, ''); // smaller batches = more reliable
+
+  try {
+    while(true){
+      // Try gamma API first, fallback to clob API
+      const url = `https://gamma-api.polymarket.com/events?active=true&closed=false&limit=${batchSize}&offset=${page * batchSize}&order=volume_24hr&ascending=false`;
+      if(page === 0) toast(`Connecting to Polymarket...`, '');
+      else toast(`Fetching page ${page + 1} (${imported} imported so far)...`, '');
+      const data = await fetchWithProxyAdmin(url);
+
+      if(!data || !Array.isArray(data) || data.length === 0) break;
+
+      // events endpoint wraps markets inside each event
+      const allMarkets = [];
+      for(const event of data){
+        if(event.markets && Array.isArray(event.markets)){
+          event.markets.forEach(m => {
+            // inherit event-level data
+            if(!m.question) m.question = event.title || event.question;
+            if(!m.image) m.image = event.image;
+            if(!m.endDate) m.endDate = event.endDate;
+            if(!m.tags) m.tags = event.tags;
+            allMarkets.push(m);
+          });
+        } else if(event.question){
+          allMarkets.push(event);
+        }
+      }
+
+      for(const pm of allMarkets){
+        if(!pm.question) continue;
+        if(pm.closed === true || pm.active === false) continue;
+
+        const pmId = String(pm.id || pm.conditionId || '');
+        if(!pmId) continue;
+
+        // deadline
+        let deadline = null;
+        if(pm.endDate || pm.end_date_iso){
+          const d = new Date(pm.endDate || pm.end_date_iso);
+          if(isNaN(d.getTime())) continue;
+          if(d < new Date()) continue;
+          deadline = Timestamp.fromDate(d);
+        } else {
+          deadline = Timestamp.fromDate(new Date(Date.now() + 7*24*60*60*1000));
+        }
+
+        // odds
+        let yesOdds = 50;
+        try {
+          const prices = JSON.parse(pm.outcomePrices||'[]');
+          if(prices[0]) yesOdds = Math.round(parseFloat(prices[0]) * 100);
+        } catch(e){}
+
+        // outcomes
+        let outcomesArr = ['Yes','No'];
+        try {
+          const parsed = JSON.parse(pm.outcomes||'[]');
+          if(Array.isArray(parsed) && parsed.length >= 2) outcomesArr = parsed;
+        } catch(e){}
+
+        let outcomePricesArr = [];
+        try {
+          outcomePricesArr = JSON.parse(pm.outcomePrices||'[]').map(p => parseFloat(p));
+        } catch(e){}
+
+        let pmTagsAdmin = [];
+        try {
+          if(pm.tags) pmTagsAdmin = Array.isArray(pm.tags) ? pm.tags.map(t=>typeof t==='string'?t:(t.slug||t.name||'')) : [];
+          if(pm.category) pmTagsAdmin.push(pm.category);
+        } catch(e){}
+        const category = detectCategoryAdmin(pm.question, pmTagsAdmin);
+        const imageUrl = pm.image || pm.icon || '';
+
+        // check if exists using cached map
+        const existingDoc = _existingPmIds[pmId];
+        const snap = existingDoc ? { empty: false, docs: [existingDoc] } : { empty: true };
+
+        if(!snap.empty){
+          const existing = snap.docs[0].data();
+          // only update if still active
+          if(existing.status === 'active'){
+            await updateDoc(snap.docs[0].ref, {
+              polymarketYesOdds: yesOdds,
+              polymarketVolume: pm.volume || 0,
+              deadline,
+              outcomes: JSON.stringify(outcomesArr),
+              outcomePrices: JSON.stringify(outcomePricesArr),
+              outcomeCount: outcomesArr.length,
+              imageUrl: imageUrl || existing.imageUrl || '',
+              question: pm.question, // update question in case it changed
+            });
+            updated++;
+          }
+          continue;
+        }
+
+        // build pools
+        const poolsObj = { yesPool:0, noPool:0 };
+        outcomesArr.forEach(o => {
+          const key = 'pool_' + o.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase();
+          poolsObj[key] = 0;
+        });
+
+        function slugifyAdmin(text){
+          return (text||'').toLowerCase().replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-').replace(/-+/g,'-').substring(0,60);
+        }
+        pendingWrites.push({
+          question: pm.question,
+          description: pm.description || '',
+          category,
+          status: 'active',
+          yesPool: 0,
+          noPool: 0,
+          imageUrl,
+          polymarketId: pmId,
+          polymarketSlug: pm.slug || '',
+          polymarketVolume: pm.volume || 0,
+          polymarketYesOdds: yesOdds,
+          deadline,
+          outcomes: JSON.stringify(outcomesArr),
+          outcomePrices: JSON.stringify(outcomePricesArr),
+          outcomeCount: outcomesArr.length,
+          ...poolsObj,
+          createdAt: serverTimestamp(),
+          source: 'polymarket'
+        });
+        imported++;
+      }
+
+      // flush pending writes in parallel (batches of 20)
+      if(pendingWrites.length >= 20){
+        await Promise.all(pendingWrites.map(async mkt => {
+          const ref = await addDoc(collection(db,'markets'), mkt);
+          const slug = slugifyAdmin(mkt.question) + '-' + ref.id.substring(0,6);
+          return updateDoc(ref, { slug, polymarketId: mkt.polymarketId });
+        }));
+        pendingWrites = [];
+      }
+
+      if(data.length < batchSize) break;
+      page++;
+      if(page >= 40) break;
+      await new Promise(r => setTimeout(r, 100));
+    }
+
+    // flush any remaining
+    if(pendingWrites.length > 0){
+      await Promise.all(pendingWrites.map(async mkt => {
+        const ref = await addDoc(collection(db,'markets'), mkt);
+        const slug = slugifyAdmin(mkt.question) + '-' + ref.id.substring(0,6);
+        return updateDoc(ref, { slug, polymarketId: mkt.polymarketId });
+      }));
+    }
+    toast(`✅ Sync done! ${imported} new markets, ${updated} updated.`, 'success');
+  } catch(e){
+    toast('Sync error: ' + e.message, 'error');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '🔄 Sync Polymarket';
+};
+// ── TELEGRAM MARKETS ──
+function listenTelegramMarkets() {
+  getDocs(query(collection(db,'markets'), where('category','==','Telegram'), limit(100))).then(snap => {
+    const tbody = document.getElementById('tg-markets-tbody');
+    if (!tbody) return;
+    if (snap.empty) {
+      tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="e-icon">📱</div><div class="e-msg">No Telegram markets yet</div></div></td></tr>';
+      return;
+    }
+    const markets = [];
+    snap.forEach(d => markets.push({...d.data(), id:d.id}));
+    markets.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+
+    tbody.innerHTML = markets.map(m => {
+      const pool = (m.yesPool||0)+(m.noPool||0);
+      const progress = m.targetSubscribers > 0
+        ? Math.min(100, Math.round(((m.currentSubscribers||0)/m.targetSubscribers)*100))
+        : 0;
+      const actions = m.status==='active'
+        ? `<button class="btn btn-success btn-sm" onclick="adminResolveTgMarket('${m.id}','Yes')">✅ Yes</button>
+           <button class="btn btn-danger btn-sm" onclick="adminResolveTgMarket('${m.id}','No')">❌ No</button>
+           <button class="btn btn-warn btn-sm" onclick="cancelMarket('${m.id}')">🔄 Cancel</button>`
+        : statusBadge(m.status);
+      return `<tr>
+        <td><span class="text-truncate" title="${m.question}">${m.question}</span></td>
+        <td>${m.telegramLink ? `<a href="${m.telegramLink}" target="_blank" style="color:#2563eb;font-weight:700;text-decoration:none">@${m.telegramChannel||'—'} ↗</a>` : `@${m.telegramChannel||'—'}`}</td>
+        <td>${Number(m.targetSubscribers||0).toLocaleString()}</td>
+        <td>
+          <div>${Number(m.currentSubscribers||0).toLocaleString()}</div>
+          <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:4px;width:80px">
+            <div style="height:100%;width:${progress}%;background:#2563eb;border-radius:2px"></div>
+          </div>
+          <div style="font-size:10px;color:#64748b">${progress}%</div>
+        </td>
+        <td class="fw-6">${fmt(pool)}</td>
+        <td>${fmtDate(m.deadline)}</td>
+        <td>${statusBadge(m.status)}</td>
+        <td><div class="td-actions">${actions}</div></td>
+      </tr>`;
+    }).join('');
+  });
+}
+
+window.adminResolveTgMarket = async function(id, winner) {
+  if (!confirm(`Resolve this Telegram market as "${winner}"?`)) return;
+  const m = _markets[id] || {};
+  const yesPool = m.yesPool||0; const noPool = m.noPool||0;
+  const totalPool = yesPool+noPool;
+  const winningSidePool = winner==='Yes'?yesPool:noPool;
+  try {
+    const betsQ = query(collection(db,'bets'), where('marketId','==',id), where('status','==','pending'));
+    const betsSnap = await getDocs(betsQ);
+    await runTransaction(db, async tx => {
+      betsSnap.forEach(betDoc => {
+        const b = betDoc.data();
+        const isWinner = (b.side||'').toLowerCase()===winner.toLowerCase();
+        if (isWinner) {
+          const winAmt = winningSidePool>0 ? Math.floor((totalPool*0.90/winningSidePool)*Number(b.amount||0)) : Number(b.amount||0);
+          tx.update(doc(db,'bets',betDoc.id), { status:'won', winAmount:winAmt });
+          tx.update(doc(db,'users',b.uid), { balance:increment(winAmt), wins:increment(1) });
+        } else {
+          tx.update(doc(db,'bets',betDoc.id), { status:'lost' });
+          tx.update(doc(db,'users',b.uid), { losses:increment(1) });
+        }
+      });
+      tx.update(doc(db,'markets',id), { status:'resolved', result:winner, resolvedAt:serverTimestamp() });
+    });
+    toast(`Resolved as ${winner}!`, 'success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+};
+
+window.previewTgImg = function(input) {
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('tg-img-thumb').src = e.target.result;
+    document.getElementById('tg-img-preview').style.display = 'flex';
+  };
+  reader.readAsDataURL(file);
+};
+
+window._tgOutcomeMode = 'yesno';
+window.setTgOutcomeMode = function(mode) {
+  window._tgOutcomeMode = mode;
+  document.getElementById('tg-yesno-section').style.display = mode === 'yesno' ? '' : 'none';
+  document.getElementById('tg-multi-section').style.display = mode === 'multi' ? '' : 'none';
+  document.getElementById('tg-mode-yesno').style.background = mode === 'yesno' ? '#2563eb' : 'white';
+  document.getElementById('tg-mode-yesno').style.color = mode === 'yesno' ? 'white' : '#2563eb';
+  document.getElementById('tg-mode-yesno').style.border = mode === 'yesno' ? '2px solid #2563eb' : '2px solid rgba(37,99,235,0.3)';
+  document.getElementById('tg-mode-multi').style.background = mode === 'multi' ? '#2563eb' : 'white';
+  document.getElementById('tg-mode-multi').style.color = mode === 'multi' ? 'white' : '#2563eb';
+  document.getElementById('tg-mode-multi').style.border = mode === 'multi' ? '2px solid #2563eb' : '2px solid rgba(37,99,235,0.3)';
+};
+window.setTgMarketType = function(type) {
+  document.getElementById('tg-market-subtype').value = type;
+  document.getElementById('tg-type-higher').style.background = type === 'higher_than' ? '#2563eb' : 'white';
+  document.getElementById('tg-type-higher').style.color = type === 'higher_than' ? 'white' : '#2563eb';
+  document.getElementById('tg-type-higher').style.border = type === 'higher_than' ? '2px solid #2563eb' : '2px solid rgba(37,99,235,0.3)';
+  document.getElementById('tg-type-lower').style.background = type === 'lower_than' ? '#2563eb' : 'white';
+  document.getElementById('tg-type-lower').style.color = type === 'lower_than' ? 'white' : '#2563eb';
+  document.getElementById('tg-type-lower').style.border = type === 'lower_than' ? '2px solid #2563eb' : '2px solid rgba(37,99,235,0.3)';
+};
+
+window.createTelegramMarket = async function() {
+  const question = document.getElementById('tg-question').value.trim();
+  const channel = document.getElementById('tg-channel').value.trim().replace('@','');
+  const deadline = document.getElementById('tg-deadline').value;
+  const desc = document.getElementById('tg-description').value.trim();
+  const imgFile = document.getElementById('tg-img-file').files[0];
+  const marketSubType = document.getElementById('tg-market-subtype').value || 'higher_than';
+
+  if (!question || !channel || !deadline) { toast('Please fill question, channel, and deadline','warn'); return; }
+
+  const btn = document.getElementById('tg-create-btn');
+  btn.disabled = true; btn.textContent = 'Creating...';
+  try {
+    let imageUrl = '';
+    if (imgFile) imageUrl = await uploadToImgbb(imgFile);
+
+    let currentSubs = 0;
+    try {
+      const r = await fetch(`https://crediplex-production.up.railway.app/api/tg-channel-info?channel=${channel}`);
+      const d = await r.json();
+      if (d.success) currentSubs = d.memberCount;
+    } catch(e) {}
+
+    let bodyObj = {
+      question, telegramChannel: channel,
+      telegramLink: document.getElementById('tg-channel-link').value.trim(),
+      deadline, description: desc, imageUrl,
+      currentSubscribers: currentSubs,
+      marketSubType
+    };
+
+    if (window._tgOutcomeMode === 'multi') {
+      // Parse multi-outcome milestones
+      const raw = document.getElementById('tg-multi-outcomes').value;
+      const parsed = raw.split(/[\n,]+/).map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)&&n>0);
+      if (parsed.length < 2) { toast('Enter at least 2 milestones for multi-outcome mode','warn'); btn.disabled=false; btn.textContent='Create Market'; return; }
+      if (parsed.length > 200) { toast('Maximum 200 milestones allowed','warn'); btn.disabled=false; btn.textContent='Create Market'; return; }
+      bodyObj.multiOutcomes = parsed;
+      bodyObj.targetSubscribers = Math.max(...parsed); // highest milestone = overall target
+    } else {
+      const target = document.getElementById('tg-target-subs').value;
+      bodyObj.targetSubscribers = Number(target) || 0;
+    }
+
+    const res = await fetch('https://crediplex-production.up.railway.app/api/create-telegram-market', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(bodyObj)
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+
+    closeModal('modal-create-tg-market');
+    document.getElementById('tg-question').value='';
+    document.getElementById('tg-channel').value='';
+    document.getElementById('tg-target-subs').value='';
+    document.getElementById('tg-deadline').value='';
+    document.getElementById('tg-description').value='';
+    document.getElementById('tg-img-file').value='';
+    document.getElementById('tg-img-preview').style.display='none';
+    document.getElementById('tg-channel-link').value='';
+    if(document.getElementById('tg-multi-outcomes')) document.getElementById('tg-multi-outcomes').value='';
+    setTgOutcomeMode('yesno');
+    setTgMarketType('higher_than');
+    toast('Telegram market created!','success');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+  btn.disabled=false; btn.textContent='Create Market';
+};
+
+window.setMarketFilter = function(filter){
+  _marketSourceFilter = filter;
+  ['all','crediplex','polymarket'].forEach(f=>{
+    const btn = document.getElementById('mf-'+f);
+    if(btn){
+      btn.style.background = f===filter ? '#2563eb' : 'transparent';
+      btn.style.color = f===filter ? 'white' : '#64748b';
+    }
+  });
+  renderMarketsTable();
+}
+
+</script>
+</body>
+</html>
