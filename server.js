@@ -2323,8 +2323,7 @@ app.post('/api/copy-trade', async (req, res) => {
   const { traderId, marketId, side, amount } = req.body;
   if(!traderId || !marketId || !side || !amount) return res.json({ success: false, error: 'Missing params' });
   try {
-    const { getDocs, query, collection, where, getDoc, doc, runTransaction, increment, addDoc, serverTimestamp } = require('firebase-admin/firestore');
-    const relQ = query(db.collection('copyRelations').where('traderId','==',traderId));
+    const snap = await db.collection('copyRelations').where('traderId','==',traderId).get();
     const snap = await db.collection('copyRelations').where('traderId','==',traderId).get();
     for(const d of snap.docs){
       const rel = d.data();
