@@ -14,21 +14,13 @@
       "src": "https://i.postimg.cc/7hvV79Pp/file-000000007dd872438ee8e3a300b62930.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "https://i.postimg.cc/7hvV79Pp/file-000000007dd872438ee8e3a300b62930.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "https://i.postimg.cc/7hvV79Pp/file-000000007dd872438ee8e3a300b62930.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "form_factor": "narrow"
+      "purpose": "maskable"
     }
   ]
 }
