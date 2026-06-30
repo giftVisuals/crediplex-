@@ -4333,6 +4333,7 @@ app.post('/api/markets/force-sync', async (req, res) => {
 // ── CRYPTO MARKETS REMOVED — 15-min up/down feature disabled ──
 app.get('/api/crypto-markets', async (req, res) => {
   res.json({ success: true, markets: [], count: 0 });
+});
 
 // ─── TOP TRADERS CACHE ───────────────────────────────────────
 let _topTradersCache = [];
