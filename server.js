@@ -3773,7 +3773,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
       }
     }
 
-      if (depositSt.step === 'ct_awaiting_amount') {
+    if (depositSt && depositSt.step === 'ct_awaiting_amount') {
         const val = parseFloat(msg.text || '');
         const mode = depositSt.mode || 'fixed';
         if (mode === 'fixed' && (isNaN(val) || val < 200)) {
