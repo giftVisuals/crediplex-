@@ -2456,7 +2456,11 @@ app.post('/api/telegram-webhook', async (req, res) => {
       }).join('\n\n');
       await sendTelegramMessage(chatId,
         `🏆 <b>Top Crediplex Traders</b>\n\n${lines}`,
-                
+        { reply_markup: { inline_keyboard: [[{ text: '📈 Start Trading', url: 'https://crediplex.name.ng' }]] }}
+      );
+      return;
+    }
+
     // For /balance and /portfolio — 1 Firestore read: find user by chatId
     if (text === '/balance' || text === '/portfolio') {
       const userSnap = await db.collection('users').where('telegramChatId', '==', chatId.toString()).limit(1).get();
